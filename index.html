@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>손절 로그 요약기</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        .drop-zone {
+            transition: all 0.25s ease;
+        }
+        .drop-zone.drag-over {
+            background-color: #eff6ff;
+            border-color: #2563eb;
+            transform: scale(1.01);
+        }
+        .file-list-item {
+            animation: fadeIn 0.25s ease;
+        }
+        .progress-bar {
+            transition: width 0.2s ease;
+        }
+        .preview-bar {
+            transition: width 0.25s ease;
+        }
+        .mono {
+            font-variant-numeric: tabular-nums;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold tracking-tight">📊 로그 기반 손절 요약기</h1>
+            <p class="text-sm text-gray-500 mt-2">
+                대용량 .log / .txt 파일을 스트리밍으로 읽어 그룹별 손절 횟수와 손절 시각을 정리합니다.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <!-- 좌측 -->
+            <div class="xl:col-span-1 space-y-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-lg font-semibold mb-4">1. 로그 파일 업로드</h2>
+
+                    <div id="drop-zone" class="drop-zone relative border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center cursor-pointer hover:bg-gray-50">
+                        <input
+                            type="file"
+                            id="file-input"
+                            accept=".log,.txt"
+                            multiple
+                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        <div class="pointer-events-none">
+                            <div class="text-4xl mb-2">🗂️</div>
+                            <div class="font-semibold">여기를 클릭하거나 파일을 드래그하세요</div>
+                            <div class="text-sm text-gray-500 mt-2">.log, .txt 파일 지원 / 여러 개 선택 가능</div>
+                        </div>
+                    </div>
+
+                    <div id="file-list-container" class="mt-5 hidden">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="text-sm font-medium text-gray-700">
+                                선택된 파일 <span id="file-count" class="mono">0</span>개
+                            </div>
+                            <button
+                                id="clear-btn"
+                                type="button"
+                                class="text-xs text-red-500 hover:text-red-700 underline"
+                            >
+                                초기화
+                            </button>
+                        </div>
+                        <div id="file-list" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-lg font-semibold mb-4">2. 실행</h2>
+
+                    <div class="space-y-3">
+                        <button
+                            id="process-btn"
+                            type="button"
+                            disabled
+                            class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-3 rounded-xl transition"
+                        >
+                            <span id="btn-text">분석 시작</span>
+                        </button>
+
+                        <button
+                            id="download-btn"
+                            type="button"
+                            disabled
+                            class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-semibold py-3 rounded-xl transition"
+                        >
+                            요약 엑셀 다운로드
+                        </button>
+                    </div>
+
+                    <div id="status-box" class="mt-4 text-sm rounded-xl px-4 py-3 bg-blue-50 text-blue-700">
+                        파일을 선택하면 분석을 시작할 수 있습니다.
+                    </div>
+
+                    <div id="progress-wrap" class="mt-4 hidden">
+                        <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div id="progress-bar" class="progress-bar h-full w-0 bg-blue-600"></div>
+                        </div>
+                        <div id="progress-text" class="text-xs text-gray-500 mt-2 mono">0%</div>
+                    </div>
+
+                    <div class="mt-5 text-xs text-gray-500 leading-5">
+                        <div>• 손절 횟수: <span class="font-medium">[Backtest Report]</span> 기준 합산</div>
+                        <div>• 손절 시각: <span class="font-medium">[Close] + LOSS + GROUP</span> 기준 수집</div>
+                        <div>• 무손절 그룹도 결과에 포함</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 우측 -->
+            <div class="xl:col-span-2 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                        <div class="text-sm text-gray-500">총 그룹 수</div>
+                        <div id="stat-groups" class="text-2xl font-bold mt-2 mono">0</div>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                        <div class="text-sm text-gray-500">총 손절 횟수</div>
+                        <div id="stat-losses" class="text-2xl font-bold mt-2 mono">0</div>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                        <div class="text-sm text-gray-500">손절 시각 개수</div>
+                        <div id="stat-dates" class="text-2xl font-bold mt-2 mono">0</div>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                        <div class="text-sm text-gray-500">처리 파일 수</div>
+                        <div id="stat-files" class="text-2xl font-bold mt-2 mono">0</div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                    <div class="flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                            <h2 class="text-lg font-semibold">결과 미리보기</h2>
+                            <p class="text-sm text-gray-500 mt-1">
+                                그룹명 기준으로 합산되며, 같은 그룹이 여러 파일/여러 백테스트에 있으면 모두 누적됩니다.
+                            </p>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <label for="sort-mode" class="text-sm text-gray-600">정렬</label>
+                            <select id="sort-mode" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="default">기본 정렬(부호별 + 횟수)</option>
+                                <option value="count-desc">손절횟수 내림차순</option>
+                                <option value="name-asc">이름 오름차순</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="result-empty" class="mt-6 rounded-xl bg-gray-50 border border-gray-200 p-8 text-center text-gray-500">
+                        아직 분석된 데이터가 없습니다.
+                    </div>
+
+                    <div id="result-table-wrap" class="mt-6 hidden overflow-x-auto">
+                        <table class="min-w-full border border-gray-200 rounded-xl overflow-hidden">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="text-left text-sm font-semibold px-4 py-3 border-b border-gray-200">Group Name</th>
+                                    <th class="text-left text-sm font-semibold px-4 py-3 border-b border-gray-200">손절횟수</th>
+                                    <th class="text-left text-sm font-semibold px-4 py-3 border-b border-gray-200">손절일 개수</th>
+                                    <th class="text-left text-sm font-semibold px-4 py-3 border-b border-gray-200">손절일 목록</th>
+                                </tr>
+                            </thead>
+                            <tbody id="result-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+        const selectedFiles = [];
+        let summaryMap = new Map();
+        let cachedSummaryData = [];
+
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileListContainer = document.getElementById('file-list-container');
+        const fileList = document.getElementById('file-list');
+        const fileCount = document.getElementById('file-count');
+        const clearBtn = document.getElementById('clear-btn');
+
+        const processBtn = document.getElementById('process-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const btnText = document.getElementById('btn-text');
+
+        const statusBox = document.getElementById('status-box');
+        const progressWrap = document.getElementById('progress-wrap');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+
+        const statGroups = document.getElementById('stat-groups');
+        const statLosses = document.getElementById('stat-losses');
+        const statDates = document.getElementById('stat-dates');
+        const statFiles = document.getElementById('stat-files');
+
+        const resultEmpty = document.getElementById('result-empty');
+        const resultTableWrap = document.getElementById('result-table-wrap');
+        const resultBody = document.getElementById('result-body');
+        const sortMode = document.getElementById('sort-mode');
+
+        function setStatus(type, message) {
+            const classes = {
+                info: 'bg-blue-50 text-blue-700',
+                success: 'bg-emerald-50 text-emerald-700',
+                error: 'bg-red-50 text-red-700',
+                warning: 'bg-amber-50 text-amber-700'
+            };
+            statusBox.className = `mt-4 text-sm rounded-xl px-4 py-3 ${classes[type] || classes.info}`;
+            statusBox.textContent = message;
+        }
+
+        function humanFileSize(bytes) {
+            if (bytes < 1024) return `${bytes} B`;
+            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+            if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+            return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function classifyGroup(name) {
+            if (name.includes('-')) return 'minus';
+            if (name.includes('+')) return 'plus';
+            return 'other';
+        }
+
+        function normalizeGroupName(name) {
+            return String(name || '').trim();
+        }
+
+        function normalizeLossDate(dateStr) {
+            return String(dateStr || '').trim();
+        }
+
+        function ensureGroupEntry(groupName) {
+            const normalized = normalizeGroupName(groupName);
+            if (!normalized) return null;
+
+            if (!summaryMap.has(normalized)) {
+                summaryMap.set(normalized, {
+                    name: normalized,
+                    count: 0,
+                    dates: [],
+                    type: classifyGroup(normalized),
+                    reportOccurrences: 0,
+                    lossEventsFound: 0
+                });
+            }
+            return summaryMap.get(normalized);
+        }
+
+        function addReportCount(groupName, lossCount) {
+            const entry = ensureGroupEntry(groupName);
+            if (!entry) return;
+            entry.count += Number(lossCount) || 0;
+            entry.reportOccurrences += 1;
+            entry.type = classifyGroup(entry.name);
+        }
+
+        function addLossDate(groupName, dateStr) {
+            const entry = ensureGroupEntry(groupName);
+            if (!entry) return;
+            const normalized = normalizeLossDate(dateStr);
+            if (!normalized) return;
+            entry.dates.push(normalized);
+            entry.lossEventsFound += 1;
+            entry.type = classifyGroup(entry.name);
+        }
+
+        function cleanNumber(text) {
+            if (text == null) return 0;
+            if (typeof text === 'number') return text;
+            const cleaned = String(text).replace(/[^\d.-]/g, '');
+            const num = parseFloat(cleaned);
+            return Number.isFinite(num) ? num : 0;
+        }
+
+        class StreamLogParser {
+            constructor() {
+                this.inReport = false;
+                this.currentReport = null;
+                this.currentClose = null;
+            }
+
+            finalizeReport() {
+                if (this.currentReport && this.currentReport.groupName) {
+                    addReportCount(this.currentReport.groupName, this.currentReport.lossCount || 0);
+                }
+                this.inReport = false;
+                this.currentReport = null;
+            }
+
+            finalizeClose() {
+                if (
+                    this.currentClose &&
+                    this.currentClose.isLoss &&
+                    this.currentClose.groupName &&
+                    this.currentClose.dateTime
+                ) {
+                    addLossDate(this.currentClose.groupName, this.currentClose.dateTime);
+                }
+                this.currentClose = null;
+            }
+
+            finalizeAll() {
+                this.finalizeReport();
+                this.finalizeClose();
+            }
+
+            isHeaderLine(line) {
+                return /^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2},\d{3}\]\[/.test(line);
+            }
+
+            handleHeaderLine(line) {
+                // 새로운 로그 헤더가 오면 이전 close 블록은 종료
+                this.finalizeClose();
+
+                if (line.includes('[Backtest Report]')) {
+                    this.finalizeReport();
+
+                    // 합산 결과 블록은 제외
+                    if (!line.includes('백테스팅 합산 결과')) {
+                        this.inReport = true;
+                        this.currentReport = {
+                            groupName: '',
+                            lossCount: 0
+                        };
+                    }
+                    return;
+                }
+
+                // 다른 헤더가 나오면 report 블록도 종료
+                if (this.inReport) {
+                    this.finalizeReport();
+                }
+
+                if (line.includes('[Close]')) {
+                    this.currentClose = {
+                        dateTime: '',
+                        isLoss: false,
+                        groupName: ''
+                    };
+                }
+            }
+
+            parseReportLine(line) {
+                if (!this.inReport || !this.currentReport) return;
+
+                let match = line.match(/^-+\s*Group Name\s*:\s*(.+)$/i);
+                if (match) {
+                    this.currentReport.groupName = normalizeGroupName(match[1]);
+                    return;
+                }
+
+                match = line.match(/^-+\s*총 손절 회수\s*:\s*(.+)$/i);
+                if (match) {
+                    this.currentReport.lossCount = cleanNumber(match[1]);
+                }
+            }
+
+            parseCloseLine(line) {
+                if (!this.currentClose) return;
+
+                if (!this.currentClose.dateTime) {
+                    const matchDate = line.match(/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})$/);
+                    if (matchDate) {
+                        this.currentClose.dateTime = matchDate[1];
+                        return;
+                    }
+                }
+
+                if (!this.currentClose.isLoss && /□\s*LOSS\s*\[\d+\]/i.test(line)) {
+                    this.currentClose.isLoss = true;
+                    return;
+                }
+
+                if (!this.currentClose.groupName) {
+                    let matchGroup = line.match(/^-+\s*GROUP\s*:\s*(.+)$/i);
+                    if (!matchGroup) {
+                        matchGroup = line.match(/^Group\s*:\s*(.+)$/i);
+                    }
+
+                    if (matchGroup) {
+                        this.currentClose.groupName = normalizeGroupName(matchGroup[1]);
+
+                        if (
+                            this.currentClose.isLoss &&
+                            this.currentClose.dateTime &&
+                            this.currentClose.groupName
+                        ) {
+                            addLossDate(this.currentClose.groupName, this.currentClose.dateTime);
+                            this.currentClose = null;
+                        }
+                    }
+                }
+            }
+
+            parseLine(rawLine) {
+                const line = String(rawLine ?? '').replace(/\r$/, '');
+                if (!line.trim()) return;
+
+                if (this.isHeaderLine(line)) {
+                    this.handleHeaderLine(line.trim());
+                    return;
+                }
+
+                const trimmed = line.trim();
+                this.parseReportLine(trimmed);
+                this.parseCloseLine(trimmed);
+            }
+        }
+
+        function handleFiles(fileListLike) {
+            const files = Array.from(fileListLike || []);
+            if (!files.length) return;
+
+            for (const file of files) {
+                selectedFiles.push(file);
+            }
+            updateFileList();
+        }
+
+        function clearFiles() {
+            selectedFiles.length = 0;
+            summaryMap = new Map();
+            cachedSummaryData = [];
+
+            fileInput.value = '';
+            updateFileList();
+            updateStats([]);
+            renderPreview([]);
+
+            processBtn.disabled = true;
+            downloadBtn.disabled = true;
+            btnText.textContent = '분석 시작';
+            setStatus('info', '파일을 선택하면 분석을 시작할 수 있습니다.');
+            progressWrap.classList.add('hidden');
+            progressBar.style.width = '0%';
+            progressText.textContent = '0%';
+        }
+
+        function updateFileList() {
+            fileList.innerHTML = '';
+            fileCount.textContent = String(selectedFiles.length);
+
+            if (selectedFiles.length === 0) {
+                fileListContainer.classList.add('hidden');
+                processBtn.disabled = true;
+                return;
+            }
+
+            fileListContainer.classList.remove('hidden');
+            processBtn.disabled = false;
+
+            selectedFiles.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.className = 'file-list-item flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50';
+                item.innerHTML = `
+                    <div class="min-w-0">
+                        <div class="text-sm font-medium text-gray-700 truncate">${escapeHtml(file.name)}</div>
+                        <div class="text-xs text-gray-400 mt-1 mono">${index + 1}</div>
+                    </div>
+                    <div class="text-xs text-gray-500 whitespace-nowrap mono">${humanFileSize(file.size)}</div>
+                `;
+                fileList.appendChild(item);
+            });
+        }
+
+        async function processFiles() {
+            if (!selectedFiles.length) return;
+
+            summaryMap = new Map();
+            cachedSummaryData = [];
+            renderPreview([]);
+            updateStats([]);
+
+            processBtn.disabled = true;
+            downloadBtn.disabled = true;
+            btnText.textContent = '분석 중...';
+            progressWrap.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressText.textContent = '0%';
+            setStatus('info', '대용량 로그를 스트리밍으로 읽는 중입니다.');
+
+            try {
+                for (let fileIndex = 0; fileIndex < selectedFiles.length; fileIndex += 1) {
+                    const file = selectedFiles[fileIndex];
+                    await processSingleFile(file, fileIndex, selectedFiles.length);
+                }
+
+                cachedSummaryData = buildSummaryData();
+                updateStats(cachedSummaryData);
+                renderPreview(cachedSummaryData);
+
+                processBtn.disabled = false;
+                downloadBtn.disabled = false;
+                btnText.textContent = '재분석';
+                setStatus('success', `분석 완료: ${cachedSummaryData.length}개 그룹이 집계되었습니다.`);
+            } catch (error) {
+                console.error(error);
+                processBtn.disabled = false;
+                btnText.textContent = '분석 시작';
+                downloadBtn.disabled = true;
+                setStatus('error', `분석 중 오류: ${error.message}`);
+            }
+        }
+
+        function processSingleFile(file, fileIndex, totalFiles) {
+            return new Promise((resolve, reject) => {
+                const parser = new StreamLogParser();
+                const reader = new FileReader();
+
+                let offset = 0;
+                let leftover = '';
+                const fileSize = file.size;
+
+                function readNextChunk() {
+                    const blob = file.slice(offset, offset + CHUNK_SIZE);
+                    reader.readAsText(blob, 'UTF-8');
+                }
+
+                reader.onload = (event) => {
+                    try {
+                        const chunkText = event.target.result || '';
+                        let text = leftover + chunkText;
+                        let start = 0;
+                        let newlineIndex = 0;
+
+                        while ((newlineIndex = text.indexOf('\n', start)) !== -1) {
+                            const rawLine = text.slice(start, newlineIndex);
+                            parser.parseLine(rawLine);
+                            start = newlineIndex + 1;
+                        }
+
+                        leftover = text.slice(start);
+                        text = null;
+
+                        offset += CHUNK_SIZE;
+
+                        const filePercent = Math.min(100, Math.round((offset / fileSize) * 100));
+                        const totalPercent = Math.min(
+                            100,
+                            Math.round(((fileIndex + filePercent / 100) / totalFiles) * 100)
+                        );
+
+                        progressBar.style.width = `${totalPercent}%`;
+                        progressText.textContent = `파일 ${fileIndex + 1}/${totalFiles} · ${file.name} · ${filePercent}%`;
+
+                        if (offset < fileSize) {
+                            setTimeout(readNextChunk, 0);
+                        } else {
+                            if (leftover.trim()) {
+                                parser.parseLine(leftover);
+                            }
+                            parser.finalizeAll();
+                            resolve();
+                        }
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+
+                reader.onerror = () => {
+                    reject(reader.error || new Error(`${file.name} 읽기 실패`));
+                };
+
+                readNextChunk();
+            });
+        }
+
+        function buildSummaryData() {
+            const result = [];
+
+            summaryMap.forEach((entry) => {
+                const sortedDates = [...entry.dates].sort((a, b) => a.localeCompare(b));
+
+                result.push({
+                    name: entry.name,
+                    count: entry.count,
+                    dates: sortedDates,
+                    type: entry.type,
+                    reportOccurrences: entry.reportOccurrences,
+                    lossEventsFound: entry.lossEventsFound
+                });
+            });
+
+            return sortSummaryData(result, sortMode.value);
+        }
+
+        function sortSummaryData(data, mode) {
+            const arr = [...data];
+
+            if (mode === 'count-desc') {
+                return arr.sort((a, b) => {
+                    if (b.count !== a.count) return b.count - a.count;
+                    return a.name.localeCompare(b.name);
+                });
+            }
+
+            if (mode === 'name-asc') {
+                return arr.sort((a, b) => a.name.localeCompare(b.name));
+            }
+
+            const minus = arr
+                .filter((d) => d.type === 'minus')
+                .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+
+            const plus = arr
+                .filter((d) => d.type === 'plus')
+                .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+
+            const other = arr
+                .filter((d) => d.type === 'other')
+                .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+
+            return [...minus, ...plus, ...other];
+        }
+
+        function updateStats(data) {
+            const totalGroups = data.length;
+            const totalLosses = data.reduce((sum, item) => sum + (item.count || 0), 0);
+            const totalDates = data.reduce((sum, item) => sum + item.dates.length, 0);
+
+            statGroups.textContent = String(totalGroups);
+            statLosses.textContent = String(totalLosses);
+            statDates.textContent = String(totalDates);
+            statFiles.textContent = String(selectedFiles.length);
+        }
+
+        function renderPreview(data) {
+            resultBody.innerHTML = '';
+
+            if (!data.length) {
+                resultEmpty.classList.remove('hidden');
+                resultTableWrap.classList.add('hidden');
+                return;
+            }
+
+            resultEmpty.classList.add('hidden');
+            resultTableWrap.classList.remove('hidden');
+
+            const maxCount = Math.max(...data.map((d) => d.count), 0);
+
+            data.forEach((item) => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-gray-200 align-top';
+
+                const barColor =
+                    item.type === 'minus' ? 'bg-red-400' :
+                    item.type === 'plus' ? 'bg-emerald-400' :
+                    'bg-gray-400';
+
+                const nameColor =
+                    item.type === 'minus' ? 'text-red-700' :
+                    item.type === 'plus' ? 'text-emerald-700' :
+                    'text-gray-800';
+
+                const widthPercent = maxCount > 0 ? (item.count / maxCount) * 100 : 0;
+
+                const dateText = item.dates.length
+                    ? item.dates.map(escapeHtml).join('<br>')
+                    : '<span class="text-gray-400">없음</span>';
+
+                tr.innerHTML = `
+                    <td class="px-4 py-4 text-sm font-semibold ${nameColor}">
+                        ${escapeHtml(item.name)}
+                    </td>
+                    <td class="px-4 py-4 text-sm">
+                        <div class="w-56 max-w-full">
+                            <div class="relative h-8 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                                <div class="preview-bar absolute left-0 top-0 h-full ${barColor}" style="width:${widthPercent}%"></div>
+                                <div class="relative z-10 h-full flex items-center justify-center font-semibold mono text-gray-800">
+                                    ${item.count}
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-4 py-4 text-sm mono">
+                        ${item.dates.length}
+                    </td>
+                    <td class="px-4 py-4 text-sm leading-6 whitespace-nowrap mono">
+                        ${dateText}
+                    </td>
+                `;
+
+                resultBody.appendChild(tr);
+            });
+        }
+
+        async function downloadExcel() {
+            if (!cachedSummaryData.length) return;
+
+            const workbook = new ExcelJS.Workbook();
+            const sheet = workbook.addWorksheet('손절요약시트');
+
+            sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+            const maxDatesCount = Math.max(...cachedSummaryData.map((d) => d.dates.length), 0);
+
+            sheet.columns = [
+                { header: 'Group Name', key: 'name', width: 28 },
+                { header: '손절횟수', key: 'count', width: 14 },
+                { header: '', key: 'spacer', width: 3 }
+            ];
+
+            for (let i = 0; i < maxDatesCount; i += 1) {
+                sheet.getColumn(4 + i).width = 22;
+                sheet.getCell(1, 4 + i).value = `손절일 ${i + 1}`;
+            }
+
+            const headerRow = sheet.getRow(1);
+            headerRow.height = 22;
+            headerRow.eachCell((cell) => {
+                cell.font = { bold: true };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFF3F4F6' }
+                };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                    left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                    bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                    right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+                };
+            });
+
+            let rowIndex = 2;
+
+            function writeGroupRows(groupData, nameArgb) {
+                const start = rowIndex;
+
+                groupData.forEach((item) => {
+                    const rowValues = [item.name, item.count, '', ...item.dates];
+                    const row = sheet.addRow(rowValues);
+
+                    row.getCell(1).font = { bold: true, color: { argb: nameArgb } };
+                    row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
+                    row.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
+
+                    const totalCols = 3 + maxDatesCount;
+                    for (let col = 1; col <= totalCols; col += 1) {
+                        const cell = row.getCell(col);
+                        if (col >= 4) {
+                            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                        }
+                        cell.border = {
+                            top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                            left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                            bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                            right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+                        };
+                    }
+
+                    rowIndex += 1;
+                });
+
+                return {
+                    start,
+                    end: rowIndex - 1
+                };
+            }
+
+            const minusGroup = cachedSummaryData.filter((d) => d.type === 'minus');
+            const plusGroup = cachedSummaryData.filter((d) => d.type === 'plus');
+            const otherGroup = cachedSummaryData.filter((d) => d.type === 'other');
+
+            const minusRange = writeGroupRows(minusGroup, 'FFB91C1C');
+            const plusRange = writeGroupRows(plusGroup, 'FF047857');
+            const otherRange = writeGroupRows(otherGroup, 'FF111827');
+
+            function addDataBar(range, argbColor) {
+                if (!range || range.start > range.end) return;
+                sheet.addConditionalFormatting({
+                    ref: `B${range.start}:B${range.end}`,
+                    rules: [
+                        {
+                            type: 'dataBar',
+                            cfvo: [
+                                { type: 'min' },
+                                { type: 'max' }
+                            ],
+                            color: { argb: argbColor },
+                            showValue: true,
+                            gradient: true
+                        }
+                    ]
+                });
+            }
+
+            addDataBar(minusRange, 'FFFF7B7B');
+            addDataBar(plusRange, 'FF6EE7B7');
+            addDataBar(otherRange, 'FFA3A3A3');
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob(
+                [buffer],
+                { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+            );
+
+            saveAs(blob, '손절요약_로그기반.xlsx');
+        }
+
+        // 이벤트
+        dropZone.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropZone.classList.remove('drag-over');
+            handleFiles(event.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (event) => {
+            handleFiles(event.target.files);
+        });
+
+        clearBtn.addEventListener('click', clearFiles);
+        processBtn.addEventListener('click', processFiles);
+        downloadBtn.addEventListener('click', downloadExcel);
+
+        sortMode.addEventListener('change', () => {
+            if (!summaryMap.size) return;
+            cachedSummaryData = buildSummaryData();
+            renderPreview(cachedSummaryData);
+        });
+
+        updateStats([]);
+        renderPreview([]);
+    </script>
+</body>
+</html>
