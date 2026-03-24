@@ -838,12 +838,12 @@
             summarySheet.views = [{ state: 'frozen', ySplit: 1 }];
 
             summarySheet.getColumn(1).width = 20;
-            summarySheet.getColumn(2).width = 12;
+            summarySheet.getColumn(2).width = 15;
             summarySheet.getColumn(3).width = 3;
 
             for (let i = 0; i < maxDatesCount; i++) {
                 const colIdx = 4 + i;
-                summarySheet.getColumn(colIdx).width = 15;
+                summarySheet.getColumn(colIdx).width = 20;
                 const cell = summarySheet.getCell(1, colIdx);
                 cell.value = `손절일 ${i + 1}`;
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
