@@ -868,6 +868,7 @@
 
             const writeGroup = (groupData, colorCode) => {
                 const startRow = currentRowIdx;
+                let lastNonZeroRow = currentRowIdx - 1; // 0이 아닌 마지막 행 추적용
 
                 for (let i = 0; i < groupData.length; i++) {
                     const d = groupData[i];
@@ -882,6 +883,11 @@
                         newRow.getCell(c).alignment = { horizontal: 'center' };
                     }
 
+                    // 카운트가 0보다 클 때만 행 번호 기록
+                    if (d.count > 0) {
+                        lastNonZeroRow = currentRowIdx;
+                    }
+
                     currentRowIdx++;
 
                     if ((currentRowIdx - 2) % 100 === 0) {
@@ -892,7 +898,7 @@
                 }
 
                 const endRow = currentRowIdx - 1;
-                return { startRow, endRow };
+                return { startRow, endRow, lastNonZeroRow };
             };
 
             function awaitTick() {
@@ -903,12 +909,12 @@
             const plusRange = writeGroup(plusGroup, 'FF006600');
             const otherRange = writeGroup(otherGroup, 'FF000000');
 
-            if (minusGroup.length > 0) {
+            if (minusRange.lastNonZeroRow >= minusRange.startRow) {
                 summarySheet.addConditionalFormatting({
-                    ref: `B${minusRange.startRow}:B${minusRange.endRow}`,
+                    ref: `B${minusRange.startRow}:B${minusRange.lastNonZeroRow}`,
                     rules: [{
                         type: 'dataBar',
-                        cfvo: [{ type: 'num', value: 1 }, { type: 'max' }],
+                        cfvo: [{ type: 'num', value: 0 }, { type: 'max' }],
                         color: { argb: 'FFFF6B6B' },
                         showValue: true,
                         gradient: true
@@ -916,12 +922,12 @@
                 });
             }
 
-            if (plusGroup.length > 0) {
+            if (plusRange.lastNonZeroRow >= plusRange.startRow) {
                 summarySheet.addConditionalFormatting({
-                    ref: `B${plusRange.startRow}:B${plusRange.endRow}`,
+                    ref: `B${plusRange.startRow}:B${plusRange.lastNonZeroRow}`,
                     rules: [{
                         type: 'dataBar',
-                        cfvo: [{ type: 'num', value: 1 }, { type: 'max' }],
+                        cfvo: [{ type: 'num', value: 0 }, { type: 'max' }],
                         color: { argb: 'FF6BFF8E' },
                         showValue: true,
                         gradient: true
@@ -929,12 +935,12 @@
                 });
             }
 
-            if (otherGroup.length > 0) {
+            if (otherRange.lastNonZeroRow >= otherRange.startRow) {
                 summarySheet.addConditionalFormatting({
-                    ref: `B${otherRange.startRow}:B${otherRange.endRow}`,
+                    ref: `B${otherRange.startRow}:B${otherRange.lastNonZeroRow}`,
                     rules: [{
                         type: 'dataBar',
-                        cfvo: [{ type: 'num', value: 1 }, { type: 'max' }],
+                        cfvo: [{ type: 'num', value: 0 }, { type: 'max' }],
                         color: { argb: 'FFD0D0D0' },
                         showValue: true,
                         gradient: true
