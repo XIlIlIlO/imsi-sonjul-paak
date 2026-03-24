@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>로그 기반 손절 요약기 (Memory Safe)</title>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.min.js"></script>
+    <title>로그 기반 손절 요약기 (No Preview / CSV Stream)</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -16,20 +15,20 @@
             color: #222;
         }
         .container {
-            max-width: 1320px;
+            max-width: 1100px;
             margin: 0 auto;
         }
         .header {
             text-align: center;
             color: white;
-            margin-bottom: 26px;
+            margin-bottom: 24px;
         }
         .header h1 {
             margin: 0;
-            font-size: 2.3rem;
+            font-size: 2.2rem;
         }
         .header p {
-            margin: 8px 0 0 0;
+            margin-top: 8px;
             opacity: 0.92;
         }
         .grid {
@@ -37,12 +36,12 @@
             grid-template-columns: 380px 1fr;
             gap: 20px;
         }
-        @media (max-width: 1080px) {
+        @media (max-width: 980px) {
             .grid {
                 grid-template-columns: 1fr;
             }
         }
-        .card {
+        .card, .stat-card {
             background: white;
             border-radius: 16px;
             padding: 22px;
@@ -50,7 +49,7 @@
         }
         .card h2 {
             margin: 0 0 16px 0;
-            font-size: 1.15rem;
+            font-size: 1.1rem;
             border-bottom: 3px solid #667eea;
             padding-bottom: 10px;
         }
@@ -75,12 +74,8 @@
             opacity: 0;
             cursor: pointer;
         }
-        .muted {
-            color: #64748b;
-            font-size: 0.92rem;
-        }
         .file-list {
-            max-height: 260px;
+            max-height: 250px;
             overflow-y: auto;
             border: 1px solid #e5e7eb;
             border-radius: 12px;
@@ -116,17 +111,9 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 8px 18px rgba(102,126,234,0.35);
-        }
         .btn-green {
             background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
             color: white;
-        }
-        .btn-green:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 8px 18px rgba(34,197,94,0.35);
         }
         .btn-gray {
             background: #e5e7eb;
@@ -180,7 +167,6 @@
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 14px;
-            margin-bottom: 18px;
         }
         @media (max-width: 900px) {
             .stats {
@@ -192,12 +178,6 @@
                 grid-template-columns: 1fr;
             }
         }
-        .stat-card {
-            background: white;
-            border-radius: 14px;
-            padding: 18px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.18);
-        }
         .stat-label {
             color: #64748b;
             font-size: 0.9rem;
@@ -207,119 +187,22 @@
             font-weight: 800;
             margin-top: 8px;
         }
-        .preview-toolbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-bottom: 14px;
-        }
-        .preview-note {
-            color: #64748b;
-            font-size: 0.9rem;
-        }
-        select {
-            border: 1px solid #d1d5db;
-            border-radius: 10px;
-            padding: 10px 12px;
-            font-size: 0.94rem;
-            background: white;
-        }
-        .table-wrap {
-            overflow-x: auto;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 880px;
-            background: white;
-        }
-        th, td {
-            border-bottom: 1px solid #edf2f7;
-            padding: 12px 12px;
-            text-align: left;
-            vertical-align: top;
-            font-size: 0.92rem;
-        }
-        th {
-            background: #f8fafc;
-            font-weight: 800;
-            color: #334155;
-        }
-        .mono {
-            font-variant-numeric: tabular-nums;
-        }
-        .tag {
-            display: inline-block;
-            padding: 4px 9px;
-            border-radius: 999px;
-            font-size: 0.75rem;
-            font-weight: 700;
-        }
-        .tag-minus {
-            background: #fee2e2;
-            color: #b91c1c;
-        }
-        .tag-plus {
-            background: #dcfce7;
-            color: #15803d;
-        }
-        .tag-other {
-            background: #e5e7eb;
-            color: #374151;
-        }
-        .bar-bg {
-            width: 220px;
-            max-width: 100%;
-            height: 28px;
-            border-radius: 999px;
-            background: #eef2f7;
-            position: relative;
-            overflow: hidden;
-            border: 1px solid #e5e7eb;
-        }
-        .bar-fill {
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-        }
-        .bar-red { background: linear-gradient(90deg, #fca5a5, #ef4444); }
-        .bar-green { background: linear-gradient(90deg, #86efac, #22c55e); }
-        .bar-gray { background: linear-gradient(90deg, #d1d5db, #9ca3af); }
-        .bar-text {
-            position: relative;
-            z-index: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            font-weight: 800;
-            color: #111827;
-        }
-        .empty {
-            background: white;
-            border-radius: 14px;
-            padding: 42px 18px;
-            text-align: center;
-            color: #64748b;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.18);
-        }
-        .small {
-            font-size: 0.85rem;
-            color: #6b7280;
-        }
-        .danger-note {
-            margin-top: 12px;
+        .note {
+            margin-top: 16px;
             background: #fffbeb;
             color: #92400e;
             border-radius: 12px;
             padding: 12px 14px;
-            font-size: 0.88rem;
+            font-size: 0.9rem;
             line-height: 1.55;
+        }
+        .small {
+            color: #64748b;
+            font-size: 0.88rem;
+            line-height: 1.6;
+        }
+        .mono {
+            font-variant-numeric: tabular-nums;
         }
     </style>
 </head>
@@ -327,7 +210,7 @@
 <div class="container">
     <div class="header">
         <h1>📊 로그 기반 손절 요약기</h1>
-        <p>대용량 .log / .txt 파일을 스트리밍으로 읽어 그룹별 손절 횟수와 손절 시각을 합산합니다.</p>
+        <p>미리보기 없이, 대용량 로그를 스트리밍 파싱하고 CSV로 저장합니다.</p>
     </div>
 
     <div class="grid">
@@ -339,13 +222,13 @@
                     <input type="file" id="fileInput" accept=".log,.txt" multiple />
                     <div style="font-size: 2rem;">🗂️</div>
                     <div style="font-weight: 700; margin-top: 6px;">여기를 클릭하거나 파일을 드래그하세요</div>
-                    <div class="muted" style="margin-top: 8px;">여러 개 선택 가능 / .log, .txt 지원</div>
+                    <div class="small" style="margin-top: 8px;">여러 개 선택 가능 / .log, .txt 지원</div>
                 </div>
 
                 <div class="file-list" id="fileList" style="display:none;"></div>
 
                 <button class="btn btn-primary" id="processBtn" disabled>분석 시작</button>
-                <button class="btn btn-green" id="downloadBtn" disabled>요약 엑셀 다운로드</button>
+                <button class="btn btn-green" id="downloadBtn" disabled>CSV 다운로드</button>
                 <button class="btn btn-gray" id="clearBtn">초기화</button>
 
                 <div class="status info" id="statusBox">파일을 선택하면 분석을 시작할 수 있습니다.</div>
@@ -357,9 +240,9 @@
                     <div class="progress-text mono" id="progressText">0%</div>
                 </div>
 
-                <div class="danger-note">
-                    파싱 중에는 청크 단위 문자열만 들고 가도록 구성했고, 결과 미리보기는 상위 일부만 그려서 DOM 메모리도 억제했다.
-                    전체 손절일은 엑셀 다운로드 시점에만 시트 데이터로 생성된다.
+                <div class="note">
+                    이 버전은 미리보기를 만들지 않고, XLSX 워크북도 만들지 않는다.  
+                    결과는 CSV로 저장해서 브라우저 메모리 피크를 최대한 줄인다.
                 </div>
             </div>
         </div>
@@ -384,39 +267,15 @@
                 </div>
             </div>
 
-            <div class="card">
-                <div class="preview-toolbar">
-                    <div>
-                        <h2 style="margin-bottom:6px;">결과 미리보기</h2>
-                        <div class="preview-note">메모리 보호를 위해 화면에는 최대 200개 그룹만 렌더링하고, 날짜도 앞부분 일부만 보여준다.</div>
-                    </div>
-                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                        <select id="sortMode">
-                            <option value="default">기본 정렬(부호별 + 횟수)</option>
-                            <option value="count-desc">손절횟수 내림차순</option>
-                            <option value="name-asc">이름 오름차순</option>
-                        </select>
-                    </div>
+            <div class="card" style="margin-top:20px;">
+                <h2>2. 처리 방식</h2>
+                <div class="small">
+                    • 그룹별 손절 횟수는 <b>[Backtest Report]</b> 블록의 <b>Group Name</b> + <b>총 손절 회수</b>에서 읽음<br>
+                    • <b>[Backtest Report] 백테스팅 합산 결과</b>는 제외<br>
+                    • 손절 시각은 <b>[Close]</b> 블록 안의 datetime + <b>□ LOSS</b> + <b>- GROUP</b> 조합에서 읽음<br>
+                    • 미리보기 없음<br>
+                    • 저장 형식은 CSV이며, Chrome 계열에서는 가능하면 디스크에 바로 스트리밍 저장
                 </div>
-
-                <div class="empty" id="emptyBox">아직 분석된 데이터가 없습니다.</div>
-
-                <div class="table-wrap" id="tableWrap" style="display:none;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Group Name</th>
-                                <th>분류</th>
-                                <th>손절횟수</th>
-                                <th>손절일 개수</th>
-                                <th>손절일 미리보기</th>
-                            </tr>
-                        </thead>
-                        <tbody id="resultBody"></tbody>
-                    </table>
-                </div>
-
-                <div class="small" style="margin-top:12px;" id="previewMeta"></div>
             </div>
         </div>
     </div>
@@ -424,12 +283,9 @@
 
 <script>
     const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
-    const PREVIEW_LIMIT = 200;
-    const PREVIEW_DATES_LIMIT = 5;
-
-    let selectedFiles = [];
+    const selectedFiles = [];
     let summaryMap = new Map();
-    let summaryDataCache = [];
+    let analysisDone = false;
 
     const fileInput = document.getElementById('fileInput');
     const dropZone = document.getElementById('dropZone');
@@ -437,6 +293,7 @@
     const processBtn = document.getElementById('processBtn');
     const downloadBtn = document.getElementById('downloadBtn');
     const clearBtn = document.getElementById('clearBtn');
+
     const statusBox = document.getElementById('statusBox');
     const progressWrap = document.getElementById('progressWrap');
     const progressBar = document.getElementById('progressBar');
@@ -446,12 +303,6 @@
     const statLosses = document.getElementById('statLosses');
     const statDates = document.getElementById('statDates');
     const statFiles = document.getElementById('statFiles');
-
-    const sortMode = document.getElementById('sortMode');
-    const emptyBox = document.getElementById('emptyBox');
-    const tableWrap = document.getElementById('tableWrap');
-    const resultBody = document.getElementById('resultBody');
-    const previewMeta = document.getElementById('previewMeta');
 
     function setStatus(type, message) {
         statusBox.className = 'status ' + type;
@@ -486,53 +337,57 @@
         return String(name || '').trim();
     }
 
-    function normalizeLossDate(dateStr) {
-        return String(dateStr || '').trim();
-    }
-
     function classifyGroup(name) {
         if (name.includes('-')) return 'minus';
         if (name.includes('+')) return 'plus';
         return 'other';
     }
 
-    function groupTypeTag(type) {
-        if (type === 'minus') return '<span class="tag tag-minus">minus</span>';
-        if (type === 'plus') return '<span class="tag tag-plus">plus</span>';
-        return '<span class="tag tag-other">other</span>';
+    // "2025-01-13 18:34:00" -> 20250113183400 (number)
+    function compactDateTime(dateStr) {
+        const digits = String(dateStr || '').replace(/\D/g, '');
+        if (digits.length >= 14) {
+            return Number(digits.slice(0, 14));
+        }
+        return null;
+    }
+
+    function restoreDateTime(compactValue) {
+        const s = String(compactValue || '').padStart(14, '0');
+        return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)} ${s.slice(8,10)}:${s.slice(10,12)}:${s.slice(12,14)}`;
     }
 
     function ensureGroupEntry(groupName) {
-        const normalized = normalizeGroupName(groupName);
-        if (!normalized) return null;
+        const name = normalizeGroupName(groupName);
+        if (!name) return null;
 
-        if (!summaryMap.has(normalized)) {
-            summaryMap.set(normalized, {
-                name: normalized,
-                type: classifyGroup(normalized),
+        if (!summaryMap.has(name)) {
+            summaryMap.set(name, {
+                name,
+                type: classifyGroup(name),
                 count: 0,
-                dates: [],
-                reportHits: 0,
-                lossLogHits: 0
+                dates: [],        // compact numeric datetime
+                dateCount: 0
             });
         }
-        return summaryMap.get(normalized);
+        return summaryMap.get(name);
     }
 
-    function addReportCount(groupName, count) {
+    function addReportCount(groupName, lossCount) {
         const entry = ensureGroupEntry(groupName);
         if (!entry) return;
-        entry.count += Number(count) || 0;
-        entry.reportHits += 1;
+        entry.count += Number(lossCount) || 0;
     }
 
     function addLossDate(groupName, dateStr) {
         const entry = ensureGroupEntry(groupName);
         if (!entry) return;
-        const normalized = normalizeLossDate(dateStr);
-        if (!normalized) return;
-        entry.dates.push(normalized);
-        entry.lossLogHits += 1;
+
+        const compact = compactDateTime(dateStr);
+        if (compact == null) return;
+
+        entry.dates.push(compact);
+        entry.dateCount += 1;
     }
 
     class StreamLogParser {
@@ -543,14 +398,6 @@
 
         isHeaderLine(line) {
             return /^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2},\d{3}\]\[/.test(line);
-        }
-
-        resetReport() {
-            this.report = null;
-        }
-
-        resetClose() {
-            this.closeBlock = null;
         }
 
         finalizeReport() {
@@ -613,7 +460,6 @@
 
             if (line.includes('[Close]')) {
                 this.startClose();
-                return;
             }
         }
 
@@ -629,7 +475,6 @@
             match = line.match(/^-+\s*총 손절 회수\s*:\s*(.+)$/i);
             if (match) {
                 this.report.lossCount = cleanNumber(match[1]);
-                return;
             }
         }
 
@@ -654,10 +499,6 @@
                 if (!matchGroup) {
                     matchGroup = line.match(/^Group\s*:\s*(.+)$/i);
                 }
-                if (!matchGroup) {
-                    matchGroup = line.match(/^-+\s*GROUP\s*:\s*(.+?)\s*$/i);
-                }
-
                 if (matchGroup) {
                     this.closeBlock.groupName = normalizeGroupName(matchGroup[1]);
 
@@ -684,24 +525,80 @@
         }
     }
 
-    function handleFiles(files) {
-        const arr = Array.from(files || []);
-        if (!arr.length) return;
+    function updateStats() {
+        let totalGroups = 0;
+        let totalLosses = 0;
+        let totalDates = 0;
 
-        for (const file of arr) {
-            selectedFiles.push(file);
-        }
+        summaryMap.forEach(entry => {
+            totalGroups += 1;
+            totalLosses += entry.count || 0;
+            totalDates += entry.dateCount || 0;
+        });
 
-        renderFileList();
-        processBtn.disabled = selectedFiles.length === 0;
+        statGroups.textContent = String(totalGroups);
+        statLosses.textContent = String(totalLosses);
+        statDates.textContent = String(totalDates);
+        statFiles.textContent = String(selectedFiles.length);
+    }
+
+    function buildSortedSummary() {
+        const data = [];
+        summaryMap.forEach(entry => {
+            entry.dates.sort((a, b) => a - b);
+            data.push({
+                name: entry.name,
+                type: entry.type,
+                count: entry.count,
+                dates: entry.dates,
+                dateCount: entry.dateCount
+            });
+        });
+
+        const minus = data.filter(x => x.type === 'minus')
+            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+
+        const plus = data.filter(x => x.type === 'plus')
+            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+
+        const other = data.filter(x => x.type === 'other')
+            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+
+        return [...minus, ...plus, ...other];
+    }
+
+    function resetAllData() {
+        summaryMap = new Map();
+        analysisDone = false;
+        updateStats();
         downloadBtn.disabled = true;
-        setStatus('info', `${selectedFiles.length}개 파일이 선택되었습니다.`);
+    }
+
+    function clearAll() {
+        selectedFiles.length = 0;
+        summaryMap = new Map();
+        analysisDone = false;
+
+        fileInput.value = '';
+        fileList.style.display = 'none';
+        fileList.innerHTML = '';
+
+        processBtn.disabled = true;
+        downloadBtn.disabled = true;
+
+        progressWrap.style.display = 'none';
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+
+        updateStats();
+        setStatus('info', '파일을 선택하면 분석을 시작할 수 있습니다.');
     }
 
     function renderFileList() {
         if (!selectedFiles.length) {
             fileList.style.display = 'none';
             fileList.innerHTML = '';
+            processBtn.disabled = true;
             return;
         }
 
@@ -717,231 +614,26 @@
                 <div class="mono" style="white-space:nowrap;">${humanFileSize(file.size)}</div>
             </div>
         `).join('');
+
+        processBtn.disabled = false;
     }
 
-    function resetResultState() {
-        summaryMap = new Map();
-        summaryDataCache = [];
-        updateStats([]);
-        renderPreview([]);
-        downloadBtn.disabled = true;
-    }
+    function handleFiles(files) {
+        const arr = Array.from(files || []);
+        if (!arr.length) return;
 
-    function clearAll() {
-        selectedFiles = [];
-        summaryMap = new Map();
-        summaryDataCache = [];
-        fileInput.value = '';
+        for (const file of arr) {
+            selectedFiles.push(file);
+        }
+
         renderFileList();
-        updateStats([]);
-        renderPreview([]);
-        progressWrap.style.display = 'none';
-        progressBar.style.width = '0%';
-        progressText.textContent = '0%';
-        processBtn.disabled = true;
         downloadBtn.disabled = true;
-        setStatus('info', '파일을 선택하면 분석을 시작할 수 있습니다.');
+        analysisDone = false;
+        setStatus('info', `${selectedFiles.length}개 파일이 선택되었습니다.`);
+        updateStats();
     }
 
-    function sortSummaryData(data, mode) {
-        const arr = [...data];
-
-        if (mode === 'count-desc') {
-            return arr.sort((a, b) => {
-                if (b.count !== a.count) return b.count - a.count;
-                return a.name.localeCompare(b.name);
-            });
-        }
-
-        if (mode === 'name-asc') {
-            return arr.sort((a, b) => a.name.localeCompare(b.name));
-        }
-
-        const minus = arr
-            .filter(x => x.type === 'minus')
-            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
-
-        const plus = arr
-            .filter(x => x.type === 'plus')
-            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
-
-        const other = arr
-            .filter(x => x.type === 'other')
-            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
-
-        return [...minus, ...plus, ...other];
-    }
-
-    function buildSummaryData() {
-        const data = [];
-
-        summaryMap.forEach((entry) => {
-            entry.dates.sort((a, b) => a.localeCompare(b));
-            data.push({
-                name: entry.name,
-                type: entry.type,
-                count: entry.count,
-                dates: entry.dates,
-                reportHits: entry.reportHits,
-                lossLogHits: entry.lossLogHits
-            });
-        });
-
-        return sortSummaryData(data, sortMode.value);
-    }
-
-    function updateStats(data) {
-        const totalGroups = data.length;
-        const totalLosses = data.reduce((acc, cur) => acc + (cur.count || 0), 0);
-        const totalDates = data.reduce((acc, cur) => acc + cur.dates.length, 0);
-
-        statGroups.textContent = String(totalGroups);
-        statLosses.textContent = String(totalLosses);
-        statDates.textContent = String(totalDates);
-        statFiles.textContent = String(selectedFiles.length);
-    }
-
-    function renderPreview(data) {
-        resultBody.innerHTML = '';
-
-        if (!data.length) {
-            emptyBox.style.display = 'block';
-            tableWrap.style.display = 'none';
-            previewMeta.textContent = '';
-            return;
-        }
-
-        emptyBox.style.display = 'none';
-        tableWrap.style.display = 'block';
-
-        const previewRows = data.slice(0, PREVIEW_LIMIT);
-        const maxCount = Math.max(...previewRows.map(x => x.count), 0);
-
-        resultBody.innerHTML = previewRows.map(item => {
-            const widthPercent = maxCount > 0 ? Math.max(0, (item.count / maxCount) * 100) : 0;
-            const fillClass =
-                item.type === 'minus' ? 'bar-red' :
-                item.type === 'plus' ? 'bar-green' :
-                'bar-gray';
-
-            const datesPreview = item.dates.length
-                ? item.dates.slice(0, PREVIEW_DATES_LIMIT).map(d => escapeHtml(d)).join('<br>')
-                : '<span style="color:#9ca3af;">없음</span>';
-
-            const extraCount = item.dates.length > PREVIEW_DATES_LIMIT
-                ? `<div class="small" style="margin-top:6px;">외 ${item.dates.length - PREVIEW_DATES_LIMIT}개</div>`
-                : '';
-
-            return `
-                <tr>
-                    <td style="font-weight:700;">${escapeHtml(item.name)}</td>
-                    <td>${groupTypeTag(item.type)}</td>
-                    <td>
-                        <div class="bar-bg">
-                            <div class="bar-fill ${fillClass}" style="width:${widthPercent}%"></div>
-                            <div class="bar-text mono">${item.count}</div>
-                        </div>
-                    </td>
-                    <td class="mono">${item.dates.length}</td>
-                    <td class="mono">${datesPreview}${extraCount}</td>
-                </tr>
-            `;
-        }).join('');
-
-        previewMeta.textContent = `전체 ${data.length}개 그룹 중 ${Math.min(data.length, PREVIEW_LIMIT)}개만 화면에 표시 중`;
-    }
-
-    function applySheetStyle(ws, totalRowsCount, maxDatesCount) {
-        const totalCols = 3 + maxDatesCount;
-        ws['!cols'] = [
-            { wch: 24 },
-            { wch: 12 },
-            { wch: 3 }
-        ];
-
-        for (let i = 0; i < maxDatesCount; i++) {
-            ws['!cols'].push({ wch: 21 });
-        }
-
-        const range = XLSX.utils.decode_range(ws['!ref']);
-        for (let R = range.s.r; R <= range.e.r; ++R) {
-            for (let C = range.s.c; C <= range.e.c; ++C) {
-                const addr = XLSX.utils.encode_cell({ r: R, c: C });
-                if (!ws[addr]) continue;
-
-                const style = {
-                    font: { name: '맑은 고딕', sz: 11 },
-                    alignment: { vertical: 'center' },
-                    border: {
-                        top: { style: 'thin', color: { rgb: 'D1D5DB' } },
-                        bottom: { style: 'thin', color: { rgb: 'D1D5DB' } },
-                        left: { style: 'thin', color: { rgb: 'D1D5DB' } },
-                        right: { style: 'thin', color: { rgb: 'D1D5DB' } }
-                    }
-                };
-
-                if (R === 0) {
-                    style.font.bold = true;
-                    style.alignment.horizontal = 'center';
-                    style.fill = { fgColor: { rgb: 'F3F4F6' } };
-                } else {
-                    if (C === 0) style.alignment.horizontal = 'left';
-                    else if (C === 1 || C === 2) style.alignment.horizontal = 'center';
-                    else style.alignment.horizontal = 'center';
-                }
-
-                ws[addr].s = style;
-            }
-        }
-
-        for (let rowIndex = 1; rowIndex <= totalRowsCount; rowIndex++) {
-            const typeCell = ws[XLSX.utils.encode_cell({ r: rowIndex, c: 0 })];
-            if (!typeCell || !typeCell.v) continue;
-
-            const name = String(typeCell.v);
-            if (name.includes('-')) {
-                typeCell.s = typeCell.s || {};
-                typeCell.s.font = { ...(typeCell.s.font || {}), color: { rgb: 'B91C1C' }, bold: true };
-            } else if (name.includes('+')) {
-                typeCell.s = typeCell.s || {};
-                typeCell.s.font = { ...(typeCell.s.font || {}), color: { rgb: '15803D' }, bold: true };
-            } else {
-                typeCell.s = typeCell.s || {};
-                typeCell.s.font = { ...(typeCell.s.font || {}), color: { rgb: '111827' }, bold: true };
-            }
-        }
-    }
-
-    function downloadExcel() {
-        if (!summaryDataCache.length) return;
-
-        const workbook = XLSX.utils.book_new();
-
-        const maxDatesCount = summaryDataCache.reduce((max, item) => Math.max(max, item.dates.length), 0);
-
-        const headerRow = ['Group Name', '손절횟수', ''];
-        for (let i = 0; i < maxDatesCount; i++) {
-            headerRow.push(`손절일 ${i + 1}`);
-        }
-
-        const rows = [headerRow];
-
-        for (const item of summaryDataCache) {
-            const row = [item.name, item.count, ''];
-            if (item.dates.length) {
-                for (const d of item.dates) row.push(d);
-            }
-            rows.push(row);
-        }
-
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        applySheetStyle(ws, summaryDataCache.length, maxDatesCount);
-
-        XLSX.utils.book_append_sheet(workbook, ws, '손절요약시트');
-        XLSX.writeFile(workbook, '손절요약_로그기반_메모리안전버전.xlsx');
-    }
-
-    async function pause(ms) {
+    function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
@@ -982,27 +674,28 @@
                     chunkText = null;
 
                     let start = 0;
-                    let newLineIndex = 0;
+                    let nextNewLine = 0;
 
-                    while ((newLineIndex = data.indexOf('\n', start)) !== -1) {
-                        const rawLine = data.substring(start, newLineIndex);
+                    while ((nextNewLine = data.indexOf('\n', start)) !== -1) {
+                        const rawLine = data.substring(start, nextNewLine);
                         if (rawLine.trim().length > 0) {
                             parser.parseLine(rawLine);
                         }
-                        start = newLineIndex + 1;
+                        start = nextNewLine + 1;
                     }
 
                     leftover = data.substring(start);
                     data = null;
 
                     offset += CHUNK_SIZE;
+
                     const filePercent = Math.min(100, Math.round((offset / fileSize) * 100));
-                    const totalProgress = Math.min(
+                    const totalPercent = Math.min(
                         100,
                         Math.round(((fileIndex * 100) + filePercent) / totalFiles)
                     );
 
-                    progressBar.style.width = totalProgress + '%';
+                    progressBar.style.width = totalPercent + '%';
                     progressText.textContent = `파일 ${fileIndex + 1}/${totalFiles} · ${file.name} · ${filePercent}%`;
 
                     if (offset < fileSize) {
@@ -1034,35 +727,133 @@
     async function processFiles() {
         if (!selectedFiles.length) return;
 
-        resetResultState();
+        resetAllData();
+
         processBtn.disabled = true;
         downloadBtn.disabled = true;
         progressWrap.style.display = 'block';
         progressBar.style.width = '0%';
         progressText.textContent = '0%';
-        setStatus('info', '대용량 로그를 스트리밍으로 읽는 중입니다.');
+        setStatus('info', '대용량 로그를 스트리밍으로 분석 중입니다.');
 
         try {
             for (let i = 0; i < selectedFiles.length; i++) {
                 await processSingleFile(selectedFiles[i], i, selectedFiles.length);
+                updateStats();
+
                 progressText.textContent = `RAM 정리 중... (${i + 1}/${selectedFiles.length})`;
-                await pause(150);
+                await sleep(120);
             }
 
-            summaryDataCache = buildSummaryData();
-            updateStats(summaryDataCache);
-            renderPreview(summaryDataCache);
-
-            downloadBtn.disabled = false;
+            analysisDone = true;
             processBtn.disabled = false;
-            setStatus('success', `분석 완료: ${summaryDataCache.length}개 그룹 집계 완료`);
+            downloadBtn.disabled = false;
             progressBar.style.width = '100%';
             progressText.textContent = '완료';
+            setStatus('success', `분석 완료: ${summaryMap.size}개 그룹 집계 완료`);
         } catch (err) {
             console.error(err);
             processBtn.disabled = false;
             downloadBtn.disabled = true;
             setStatus('error', `오류 발생: ${err.message}`);
+        }
+    }
+
+    function csvEscape(value) {
+        const s = String(value ?? '');
+        if (/[",\n]/.test(s)) {
+            return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+    }
+
+    function buildCsvHeader(maxDatesCount) {
+        let header = 'Group Name,손절횟수,';
+        for (let i = 0; i < maxDatesCount; i++) {
+            header += ',' + csvEscape(`손절일 ${i + 1}`);
+        }
+        return header + '\n';
+    }
+
+    function buildCsvLine(item) {
+        let line = csvEscape(item.name) + ',' + csvEscape(item.count) + ',';
+
+        for (let i = 0; i < item.dates.length; i++) {
+            line += ',' + csvEscape(restoreDateTime(item.dates[i]));
+        }
+        return line + '\n';
+    }
+
+    async function downloadCsv() {
+        if (!analysisDone || !summaryMap.size) return;
+
+        const sorted = buildSortedSummary();
+        let maxDatesCount = 0;
+        for (const item of sorted) {
+            if (item.dates.length > maxDatesCount) maxDatesCount = item.dates.length;
+        }
+
+        setStatus('info', 'CSV 저장 준비 중입니다.');
+
+        // Chrome/Edge 계열: 디스크로 직접 스트리밍 저장
+        if ('showSaveFilePicker' in window) {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: '손절요약_로그기반.csv',
+                    types: [{
+                        description: 'CSV File',
+                        accept: { 'text/csv': ['.csv'] }
+                    }]
+                });
+
+                const writable = await handle.createWritable();
+                await writable.write('\uFEFF'); // BOM
+
+                await writable.write(buildCsvHeader(maxDatesCount));
+
+                for (let i = 0; i < sorted.length; i++) {
+                    await writable.write(buildCsvLine(sorted[i]));
+
+                    if (i % 100 === 0) {
+                        progressText.textContent = `저장 중... ${i + 1}/${sorted.length}`;
+                        await sleep(0);
+                    }
+                }
+
+                await writable.close();
+                setStatus('success', 'CSV 저장 완료');
+                return;
+            } catch (err) {
+                if (err && err.name === 'AbortError') {
+                    setStatus('info', '저장이 취소되었습니다.');
+                    return;
+                }
+                console.warn('showSaveFilePicker fallback:', err);
+            }
+        }
+
+        // Fallback: Blob 다운로드
+        try {
+            const parts = ['\uFEFF', buildCsvHeader(maxDatesCount)];
+            for (let i = 0; i < sorted.length; i++) {
+                parts.push(buildCsvLine(sorted[i]));
+            }
+
+            const blob = new Blob(parts, { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '손절요약_로그기반.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            setStatus('success', 'CSV 다운로드 완료');
+        } catch (err) {
+            console.error(err);
+            setStatus('error', 'CSV 생성 중 오류: ' + err.message);
         }
     }
 
@@ -1086,17 +877,10 @@
     });
 
     processBtn.addEventListener('click', processFiles);
-    downloadBtn.addEventListener('click', downloadExcel);
+    downloadBtn.addEventListener('click', downloadCsv);
     clearBtn.addEventListener('click', clearAll);
 
-    sortMode.addEventListener('change', () => {
-        if (!summaryMap.size) return;
-        summaryDataCache = buildSummaryData();
-        renderPreview(summaryDataCache);
-    });
-
-    updateStats([]);
-    renderPreview([]);
+    updateStats();
 </script>
 </body>
 </html>
