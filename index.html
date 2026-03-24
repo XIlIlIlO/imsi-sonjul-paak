@@ -488,28 +488,18 @@
         }
 
         handleHeader(line) {
-            // 새 헤더가 시작되면 이전 Close 블록은 종료
-            this.finalizeClose();
+    // 새 헤더가 시작되면 이전 Close 블록은 종료
+    this.finalizeClose();
 
-            if (line.includes('[Backtest Report]')) {
-                if (line.includes('백테스팅 합산 결과')) {
-                    this.finalizeReport();
-                    this.reportBlock = null;
-                } else {
-                    this.startReport();
-                }
-                return;
-            }
+    // reportBlock이 열려 있으면, 다음 타임스탬프 헤더에서 종료
+    if (this.reportBlock) {
+        this.finalizeReport();
+    }
 
-            // Backtest Report가 아닌 다른 헤더가 오면 리포트 블록 종료
-            if (this.reportBlock) {
-                this.finalizeReport();
-            }
-
-            if (line.includes('[Close]')) {
-                this.startClose();
-            }
-        }
+    if (line.includes('[Close]')) {
+        this.startClose();
+    }
+}
 
         parseReportLine(line) {
             if (!this.reportBlock) return;
@@ -552,19 +542,33 @@
         }
 
         parseLine(rawLine) {
-            const line = String(rawLine || '').replace(/\r$/, '');
-            if (!line.trim()) return;
+    const line = String(rawLine || '').replace(/\r$/, '');
+    const trimmed = line.trim();
+    if (!trimmed) return;
 
-            if (this.isHeaderLine(line)) {
-                this.handleHeader(line.trim());
-                return;
-            }
-
-            const trimmed = line.trim();
-            this.parseReportLine(trimmed);
-            this.parseCloseLine(trimmed);
-        }
+    // 1. 타임스탬프 헤더 처리
+    if (this.isHeaderLine(trimmed)) {
+        this.handleHeader(trimmed);
+        return;
     }
+
+    // 2. 본문 줄에 있는 Backtest Report 시작 처리
+    if (trimmed === '[Backtest Report]') {
+        this.startReport();
+        return;
+    }
+
+    // 3. 합산 결과 블록은 그룹 등록 대상이 아님
+    if (trimmed.startsWith('[Backtest Report] 백테스팅 합산 결과')) {
+        this.finalizeReport();
+        this.reportBlock = null;
+        return;
+    }
+
+    // 4. 나머지 본문 파싱
+    this.parseReportLine(trimmed);
+    this.parseCloseLine(trimmed);
+}
 
     function renderFileList() {
         if (!selectedFiles.length) {
