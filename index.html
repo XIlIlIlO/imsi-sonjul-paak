@@ -3,9 +3,14 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>로그 기반 손절 요약기 (No Preview / CSV Stream)</title>
+    <title>로그 기반 손절 요약기</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
     <style>
         * { box-sizing: border-box; }
+
         body {
             margin: 0;
             font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
@@ -14,73 +19,86 @@
             padding: 20px;
             color: #222;
         }
+
         .container {
             max-width: 1100px;
             margin: 0 auto;
         }
+
         .header {
             text-align: center;
             color: white;
             margin-bottom: 24px;
         }
+
         .header h1 {
             margin: 0;
             font-size: 2.2rem;
         }
+
         .header p {
             margin-top: 8px;
             opacity: 0.92;
         }
+
         .grid {
             display: grid;
-            grid-template-columns: 380px 1fr;
+            grid-template-columns: 400px 1fr;
             gap: 20px;
         }
+
         @media (max-width: 980px) {
             .grid {
                 grid-template-columns: 1fr;
             }
         }
+
         .card, .stat-card {
             background: white;
             border-radius: 16px;
             padding: 22px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.18);
         }
+
         .card h2 {
             margin: 0 0 16px 0;
             font-size: 1.1rem;
             border-bottom: 3px solid #667eea;
             padding-bottom: 10px;
         }
+
         .drop-zone {
             border: 2px dashed #cbd5e1;
             border-radius: 14px;
-            padding: 26px 18px;
+            padding: 28px 18px;
             text-align: center;
             background: #f8fafc;
             transition: all 0.2s ease;
             cursor: pointer;
             position: relative;
         }
+
         .drop-zone:hover,
         .drop-zone.drag-over {
             border-color: #667eea;
             background: #eef2ff;
         }
+
         .drop-zone input {
             position: absolute;
             inset: 0;
             opacity: 0;
             cursor: pointer;
         }
+
         .file-list {
-            max-height: 250px;
+            max-height: 260px;
             overflow-y: auto;
             border: 1px solid #e5e7eb;
             border-radius: 12px;
             margin-top: 14px;
         }
+
         .file-item {
             display: flex;
             justify-content: space-between;
@@ -89,9 +107,11 @@
             border-bottom: 1px solid #eef2f7;
             font-size: 0.92rem;
         }
+
         .file-item:last-child {
             border-bottom: none;
         }
+
         .btn {
             width: 100%;
             border: none;
@@ -103,22 +123,37 @@
             transition: all 0.2s ease;
             margin-top: 10px;
         }
+
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
+
         .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(102,126,234,0.35);
+        }
+
         .btn-green {
             background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
             color: white;
         }
+
+        .btn-green:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(34,197,94,0.35);
+        }
+
         .btn-gray {
             background: #e5e7eb;
             color: #374151;
         }
+
         .status {
             margin-top: 12px;
             border-radius: 12px;
@@ -128,22 +163,27 @@
             display: flex;
             align-items: center;
         }
+
         .status.info {
             background: #eff6ff;
             color: #1d4ed8;
         }
+
         .status.success {
             background: #ecfdf5;
             color: #15803d;
         }
+
         .status.error {
             background: #fef2f2;
             color: #b91c1c;
         }
+
         .progress-wrap {
             display: none;
             margin-top: 14px;
         }
+
         .progress-bg {
             width: 100%;
             height: 10px;
@@ -151,56 +191,66 @@
             border-radius: 999px;
             overflow: hidden;
         }
+
         .progress-bar {
             width: 0%;
             height: 100%;
             background: linear-gradient(90deg, #667eea, #764ba2);
             transition: width 0.15s ease;
         }
+
         .progress-text {
             margin-top: 8px;
             font-size: 0.85rem;
             color: #6b7280;
             word-break: break-all;
         }
+
         .stats {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 14px;
         }
+
         @media (max-width: 900px) {
             .stats {
                 grid-template-columns: repeat(2, 1fr);
             }
         }
+
         @media (max-width: 560px) {
             .stats {
                 grid-template-columns: 1fr;
             }
         }
+
         .stat-label {
             color: #64748b;
             font-size: 0.9rem;
         }
+
         .stat-value {
             font-size: 1.8rem;
             font-weight: 800;
             margin-top: 8px;
         }
+
         .note {
-            margin-top: 16px;
+            margin-top: 18px;
             background: #fffbeb;
             color: #92400e;
             border-radius: 12px;
             padding: 12px 14px;
-            font-size: 0.9rem;
-            line-height: 1.55;
+            font-size: 0.89rem;
+            line-height: 1.6;
         }
+
         .small {
             color: #64748b;
             font-size: 0.88rem;
             line-height: 1.6;
         }
+
         .mono {
             font-variant-numeric: tabular-nums;
         }
@@ -210,7 +260,7 @@
 <div class="container">
     <div class="header">
         <h1>📊 로그 기반 손절 요약기</h1>
-        <p>미리보기 없이, 대용량 로그를 스트리밍 파싱하고 CSV로 저장합니다.</p>
+        <p>미리보기 없이, 대용량 로그를 스트리밍 파싱해서 엑셀로 저장합니다.</p>
     </div>
 
     <div class="grid">
@@ -228,7 +278,7 @@
                 <div class="file-list" id="fileList" style="display:none;"></div>
 
                 <button class="btn btn-primary" id="processBtn" disabled>분석 시작</button>
-                <button class="btn btn-green" id="downloadBtn" disabled>CSV 다운로드</button>
+                <button class="btn btn-green" id="downloadBtn" disabled>요약 엑셀 다운로드</button>
                 <button class="btn btn-gray" id="clearBtn">초기화</button>
 
                 <div class="status info" id="statusBox">파일을 선택하면 분석을 시작할 수 있습니다.</div>
@@ -241,8 +291,8 @@
                 </div>
 
                 <div class="note">
-                    이 버전은 미리보기를 만들지 않고, XLSX 워크북도 만들지 않는다.  
-                    결과는 CSV로 저장해서 브라우저 메모리 피크를 최대한 줄인다.
+                    손절횟수는 LOSS 이벤트 개수 기준으로 계산하고,
+                    Backtest Report는 0손절 그룹까지 포함시키기 위한 그룹 등록용으로만 사용합니다.
                 </div>
             </div>
         </div>
@@ -268,13 +318,13 @@
             </div>
 
             <div class="card" style="margin-top:20px;">
-                <h2>2. 처리 방식</h2>
+                <h2>2. 현재 집계 규칙</h2>
                 <div class="small">
-                    • 그룹별 손절 횟수는 <b>[Backtest Report]</b> 블록의 <b>Group Name</b> + <b>총 손절 회수</b>에서 읽음<br>
-                    • <b>[Backtest Report] 백테스팅 합산 결과</b>는 제외<br>
-                    • 손절 시각은 <b>[Close]</b> 블록 안의 datetime + <b>□ LOSS</b> + <b>- GROUP</b> 조합에서 읽음<br>
-                    • 미리보기 없음<br>
-                    • 저장 형식은 CSV이며, Chrome 계열에서는 가능하면 디스크에 바로 스트리밍 저장
+                    • 그룹 등록: <b>[Backtest Report]</b>의 <b>- Group Name :</b><br>
+                    • 손절횟수: <b>[Close]</b> 블록의 <b>□ LOSS</b> 개수<br>
+                    • 손절일: LOSS가 발생한 해당 블록의 datetime<br>
+                    • 손절 0개 그룹도 반드시 포함<br>
+                    • 출력 형식: 기존 첫 코드와 동일한 요약 엑셀 형식
                 </div>
             </div>
         </div>
@@ -325,14 +375,6 @@
             .replaceAll("'", '&#39;');
     }
 
-    function cleanNumber(valueStr) {
-        if (valueStr == null) return 0;
-        if (typeof valueStr === 'number') return valueStr;
-        const cleanStr = String(valueStr).replace(/[^\d.-]/g, '');
-        const num = parseFloat(cleanStr);
-        return Number.isFinite(num) ? num : 0;
-    }
-
     function normalizeGroupName(name) {
         return String(name || '').trim();
     }
@@ -343,12 +385,9 @@
         return 'other';
     }
 
-    // "2025-01-13 18:34:00" -> 20250113183400 (number)
     function compactDateTime(dateStr) {
         const digits = String(dateStr || '').replace(/\D/g, '');
-        if (digits.length >= 14) {
-            return Number(digits.slice(0, 14));
-        }
+        if (digits.length >= 14) return Number(digits.slice(0, 14));
         return null;
     }
 
@@ -358,41 +397,42 @@
     }
 
     function ensureGroupEntry(groupName) {
-        const name = normalizeGroupName(groupName);
-        if (!name) return null;
+        const normalized = normalizeGroupName(groupName);
+        if (!normalized) return null;
 
-        if (!summaryMap.has(name)) {
-            summaryMap.set(name, {
-                name,
-                type: classifyGroup(name),
-                count: 0,
-                dates: [],        // compact numeric datetime
-                dateCount: 0
+        if (!summaryMap.has(normalized)) {
+            summaryMap.set(normalized, {
+                name: normalized,
+                type: classifyGroup(normalized),
+                lossCount: 0,          // LOSS 이벤트 기준
+                dates: [],             // compact datetime number
+                seenFromReport: false
             });
         }
-        return summaryMap.get(name);
+        return summaryMap.get(normalized);
     }
 
-    function addReportCount(groupName, lossCount) {
+    function markGroupFromReport(groupName) {
         const entry = ensureGroupEntry(groupName);
         if (!entry) return;
-        entry.count += Number(lossCount) || 0;
+        entry.seenFromReport = true;
     }
 
-    function addLossDate(groupName, dateStr) {
+    function addLossEvent(groupName, dateStr) {
         const entry = ensureGroupEntry(groupName);
         if (!entry) return;
+
+        entry.lossCount += 1;
 
         const compact = compactDateTime(dateStr);
-        if (compact == null) return;
-
-        entry.dates.push(compact);
-        entry.dateCount += 1;
+        if (compact != null) {
+            entry.dates.push(compact);
+        }
     }
 
     class StreamLogParser {
         constructor() {
-            this.report = null;
+            this.reportBlock = null;
             this.closeBlock = null;
         }
 
@@ -401,21 +441,27 @@
         }
 
         finalizeReport() {
-            if (this.report && this.report.groupName) {
-                addReportCount(this.report.groupName, this.report.lossCount || 0);
+            if (this.reportBlock && this.reportBlock.groupName) {
+                markGroupFromReport(this.reportBlock.groupName);
             }
-            this.report = null;
+            this.reportBlock = null;
+        }
+
+        tryFinalizeClose() {
+            if (
+                this.closeBlock &&
+                this.closeBlock.dateTime &&
+                this.closeBlock.groupName &&
+                this.closeBlock.isLoss &&
+                !this.closeBlock.committed
+            ) {
+                addLossEvent(this.closeBlock.groupName, this.closeBlock.dateTime);
+                this.closeBlock.committed = true;
+            }
         }
 
         finalizeClose() {
-            if (
-                this.closeBlock &&
-                this.closeBlock.isLoss &&
-                this.closeBlock.groupName &&
-                this.closeBlock.dateTime
-            ) {
-                addLossDate(this.closeBlock.groupName, this.closeBlock.dateTime);
-            }
+            this.tryFinalizeClose();
             this.closeBlock = null;
         }
 
@@ -426,9 +472,8 @@
 
         startReport() {
             this.finalizeReport();
-            this.report = {
-                groupName: '',
-                lossCount: 0
+            this.reportBlock = {
+                groupName: ''
             };
         }
 
@@ -437,24 +482,27 @@
             this.closeBlock = {
                 dateTime: '',
                 isLoss: false,
-                groupName: ''
+                groupName: '',
+                committed: false
             };
         }
 
         handleHeader(line) {
+            // 새 헤더가 시작되면 이전 Close 블록은 종료
             this.finalizeClose();
 
             if (line.includes('[Backtest Report]')) {
                 if (line.includes('백테스팅 합산 결과')) {
                     this.finalizeReport();
-                    this.report = null;
+                    this.reportBlock = null;
                 } else {
                     this.startReport();
                 }
                 return;
             }
 
-            if (this.report) {
+            // Backtest Report가 아닌 다른 헤더가 오면 리포트 블록 종료
+            if (this.reportBlock) {
                 this.finalizeReport();
             }
 
@@ -464,17 +512,11 @@
         }
 
         parseReportLine(line) {
-            if (!this.report) return;
+            if (!this.reportBlock) return;
 
-            let match = line.match(/^-+\s*Group Name\s*:\s*(.+)$/i);
+            const match = line.match(/^-+\s*Group Name\s*:\s*(.+)$/i);
             if (match) {
-                this.report.groupName = normalizeGroupName(match[1]);
-                return;
-            }
-
-            match = line.match(/^-+\s*총 손절 회수\s*:\s*(.+)$/i);
-            if (match) {
-                this.report.lossCount = cleanNumber(match[1]);
+                this.reportBlock.groupName = normalizeGroupName(match[1]);
             }
         }
 
@@ -485,12 +527,14 @@
                 const matchDate = line.match(/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})$/);
                 if (matchDate) {
                     this.closeBlock.dateTime = matchDate[1];
+                    this.tryFinalizeClose();
                     return;
                 }
             }
 
             if (!this.closeBlock.isLoss && /□\s*LOSS\s*\[\d+\]/i.test(line)) {
                 this.closeBlock.isLoss = true;
+                this.tryFinalizeClose();
                 return;
             }
 
@@ -499,13 +543,10 @@
                 if (!matchGroup) {
                     matchGroup = line.match(/^Group\s*:\s*(.+)$/i);
                 }
+
                 if (matchGroup) {
                     this.closeBlock.groupName = normalizeGroupName(matchGroup[1]);
-
-                    if (this.closeBlock.isLoss && this.closeBlock.dateTime) {
-                        addLossDate(this.closeBlock.groupName, this.closeBlock.dateTime);
-                        this.closeBlock = null;
-                    }
+                    this.tryFinalizeClose();
                 }
             }
         }
@@ -523,75 +564,6 @@
             this.parseReportLine(trimmed);
             this.parseCloseLine(trimmed);
         }
-    }
-
-    function updateStats() {
-        let totalGroups = 0;
-        let totalLosses = 0;
-        let totalDates = 0;
-
-        summaryMap.forEach(entry => {
-            totalGroups += 1;
-            totalLosses += entry.count || 0;
-            totalDates += entry.dateCount || 0;
-        });
-
-        statGroups.textContent = String(totalGroups);
-        statLosses.textContent = String(totalLosses);
-        statDates.textContent = String(totalDates);
-        statFiles.textContent = String(selectedFiles.length);
-    }
-
-    function buildSortedSummary() {
-        const data = [];
-        summaryMap.forEach(entry => {
-            entry.dates.sort((a, b) => a - b);
-            data.push({
-                name: entry.name,
-                type: entry.type,
-                count: entry.count,
-                dates: entry.dates,
-                dateCount: entry.dateCount
-            });
-        });
-
-        const minus = data.filter(x => x.type === 'minus')
-            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
-
-        const plus = data.filter(x => x.type === 'plus')
-            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
-
-        const other = data.filter(x => x.type === 'other')
-            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
-
-        return [...minus, ...plus, ...other];
-    }
-
-    function resetAllData() {
-        summaryMap = new Map();
-        analysisDone = false;
-        updateStats();
-        downloadBtn.disabled = true;
-    }
-
-    function clearAll() {
-        selectedFiles.length = 0;
-        summaryMap = new Map();
-        analysisDone = false;
-
-        fileInput.value = '';
-        fileList.style.display = 'none';
-        fileList.innerHTML = '';
-
-        processBtn.disabled = true;
-        downloadBtn.disabled = true;
-
-        progressWrap.style.display = 'none';
-        progressBar.style.width = '0%';
-        progressText.textContent = '0%';
-
-        updateStats();
-        setStatus('info', '파일을 선택하면 분석을 시작할 수 있습니다.');
     }
 
     function renderFileList() {
@@ -618,6 +590,91 @@
         processBtn.disabled = false;
     }
 
+    function updateStats() {
+        let totalGroups = 0;
+        let totalLosses = 0;
+        let totalDates = 0;
+
+        summaryMap.forEach(entry => {
+            totalGroups += 1;
+            totalLosses += entry.lossCount || 0;
+            totalDates += entry.dates.length || 0;
+        });
+
+        statGroups.textContent = String(totalGroups);
+        statLosses.textContent = String(totalLosses);
+        statDates.textContent = String(totalDates);
+        statFiles.textContent = String(selectedFiles.length);
+    }
+
+    function buildSummaryData() {
+        const allSummaryData = [];
+        let maxDatesCount = 0;
+
+        summaryMap.forEach((entry) => {
+            entry.dates.sort((a, b) => a - b);
+
+            const item = {
+                name: entry.name,
+                count: entry.lossCount,
+                dates: entry.dates.map(restoreDateTime),
+                type: entry.type
+            };
+
+            if (item.dates.length > maxDatesCount) {
+                maxDatesCount = item.dates.length;
+            }
+
+            allSummaryData.push(item);
+        });
+
+        const minusGroup = allSummaryData
+            .filter(d => d.type === 'minus')
+            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+
+        const plusGroup = allSummaryData
+            .filter(d => d.type === 'plus')
+            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+
+        const otherGroup = allSummaryData
+            .filter(d => d.type === 'other')
+            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+
+        return {
+            minusGroup,
+            plusGroup,
+            otherGroup,
+            maxDatesCount
+        };
+    }
+
+    function resetAllData() {
+        summaryMap = new Map();
+        analysisDone = false;
+        downloadBtn.disabled = true;
+        updateStats();
+    }
+
+    function clearAll() {
+        selectedFiles.length = 0;
+        summaryMap = new Map();
+        analysisDone = false;
+
+        fileInput.value = '';
+        fileList.style.display = 'none';
+        fileList.innerHTML = '';
+
+        processBtn.disabled = true;
+        downloadBtn.disabled = true;
+
+        progressWrap.style.display = 'none';
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+
+        updateStats();
+        setStatus('info', '파일을 선택하면 분석을 시작할 수 있습니다.');
+    }
+
     function handleFiles(files) {
         const arr = Array.from(files || []);
         if (!arr.length) return;
@@ -626,11 +683,11 @@
             selectedFiles.push(file);
         }
 
-        renderFileList();
-        downloadBtn.disabled = true;
         analysisDone = false;
-        setStatus('info', `${selectedFiles.length}개 파일이 선택되었습니다.`);
+        downloadBtn.disabled = true;
+        renderFileList();
         updateStats();
+        setStatus('info', `${selectedFiles.length}개 파일이 선택되었습니다.`);
     }
 
     function sleep(ms) {
@@ -674,14 +731,14 @@
                     chunkText = null;
 
                     let start = 0;
-                    let nextNewLine = 0;
+                    let nextNewline = 0;
 
-                    while ((nextNewLine = data.indexOf('\n', start)) !== -1) {
-                        const rawLine = data.substring(start, nextNewLine);
+                    while ((nextNewline = data.indexOf('\n', start)) !== -1) {
+                        const rawLine = data.substring(start, nextNewline);
                         if (rawLine.trim().length > 0) {
                             parser.parseLine(rawLine);
                         }
-                        start = nextNewLine + 1;
+                        start = nextNewline + 1;
                     }
 
                     leftover = data.substring(start);
@@ -740,7 +797,6 @@
             for (let i = 0; i < selectedFiles.length; i++) {
                 await processSingleFile(selectedFiles[i], i, selectedFiles.length);
                 updateStats();
-
                 progressText.textContent = `RAM 정리 중... (${i + 1}/${selectedFiles.length})`;
                 await sleep(120);
             }
@@ -759,101 +815,159 @@
         }
     }
 
-    function csvEscape(value) {
-        const s = String(value ?? '');
-        if (/[",\n]/.test(s)) {
-            return '"' + s.replace(/"/g, '""') + '"';
-        }
-        return s;
-    }
-
-    function buildCsvHeader(maxDatesCount) {
-        let header = 'Group Name,손절횟수,';
-        for (let i = 0; i < maxDatesCount; i++) {
-            header += ',' + csvEscape(`손절일 ${i + 1}`);
-        }
-        return header + '\n';
-    }
-
-    function buildCsvLine(item) {
-        let line = csvEscape(item.name) + ',' + csvEscape(item.count) + ',';
-
-        for (let i = 0; i < item.dates.length; i++) {
-            line += ',' + csvEscape(restoreDateTime(item.dates[i]));
-        }
-        return line + '\n';
-    }
-
-    async function downloadCsv() {
+    async function downloadExcel() {
         if (!analysisDone || !summaryMap.size) return;
 
-        const sorted = buildSortedSummary();
-        let maxDatesCount = 0;
-        for (const item of sorted) {
-            if (item.dates.length > maxDatesCount) maxDatesCount = item.dates.length;
-        }
+        processBtn.disabled = true;
+        downloadBtn.disabled = true;
+        setStatus('info', '엑셀 파일 생성 중입니다...');
+        progressWrap.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressText.textContent = '워크북 생성 준비 중';
 
-        setStatus('info', 'CSV 저장 준비 중입니다.');
+        try {
+            const { minusGroup, plusGroup, otherGroup, maxDatesCount } = buildSummaryData();
 
-        // Chrome/Edge 계열: 디스크로 직접 스트리밍 저장
-        if ('showSaveFilePicker' in window) {
-            try {
-                const handle = await window.showSaveFilePicker({
-                    suggestedName: '손절요약_로그기반.csv',
-                    types: [{
-                        description: 'CSV File',
-                        accept: { 'text/csv': ['.csv'] }
-                    }]
-                });
+            const workbook = new ExcelJS.Workbook();
+            const summarySheet = workbook.addWorksheet('손절요약시트');
+            summarySheet.views = [{ state: 'frozen', ySplit: 1 }];
 
-                const writable = await handle.createWritable();
-                await writable.write('\uFEFF'); // BOM
+            summarySheet.getColumn(1).width = 20;
+            summarySheet.getColumn(2).width = 12;
+            summarySheet.getColumn(3).width = 3;
 
-                await writable.write(buildCsvHeader(maxDatesCount));
+            for (let i = 0; i < maxDatesCount; i++) {
+                const colIdx = 4 + i;
+                summarySheet.getColumn(colIdx).width = 15;
+                const cell = summarySheet.getCell(1, colIdx);
+                cell.value = `손절일 ${i + 1}`;
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
+                cell.font = { bold: true };
+                cell.alignment = { horizontal: 'center' };
+                cell.border = { bottom: { style: 'thin' } };
+            }
 
-                for (let i = 0; i < sorted.length; i++) {
-                    await writable.write(buildCsvLine(sorted[i]));
+            const headerRow = summarySheet.getRow(1);
+            headerRow.getCell(1).value = 'Group Name';
+            headerRow.getCell(2).value = '손절횟수';
+            headerRow.getCell(3).value = '';
 
-                    if (i % 100 === 0) {
-                        progressText.textContent = `저장 중... ${i + 1}/${sorted.length}`;
-                        await sleep(0);
+            headerRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
+            headerRow.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
+            headerRow.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
+
+            headerRow.font = { bold: true };
+            headerRow.alignment = { horizontal: 'center' };
+
+            let currentRowIdx = 2;
+
+            const writeGroup = (groupData, colorCode) => {
+                const startRow = currentRowIdx;
+
+                for (let i = 0; i < groupData.length; i++) {
+                    const d = groupData[i];
+                    const rowData = [d.name, d.count, '', ...d.dates];
+                    const newRow = summarySheet.addRow(rowData);
+
+                    newRow.getCell(1).font = { color: { argb: colorCode } };
+                    newRow.getCell(2).alignment = { horizontal: 'center' };
+                    newRow.getCell(3).alignment = { horizontal: 'center' };
+
+                    for (let c = 4; c < 4 + d.dates.length; c++) {
+                        newRow.getCell(c).alignment = { horizontal: 'center' };
+                    }
+
+                    currentRowIdx++;
+
+                    if ((currentRowIdx - 2) % 100 === 0) {
+                        progressBar.style.width = Math.min(95, Math.round(((currentRowIdx - 2) / Math.max(1, minusGroup.length + plusGroup.length + otherGroup.length)) * 100)) + '%';
+                        progressText.textContent = `엑셀 행 작성 중... ${currentRowIdx - 2}행`;
+                        awaitTick();
                     }
                 }
 
-                await writable.close();
-                setStatus('success', 'CSV 저장 완료');
-                return;
-            } catch (err) {
-                if (err && err.name === 'AbortError') {
-                    setStatus('info', '저장이 취소되었습니다.');
-                    return;
-                }
-                console.warn('showSaveFilePicker fallback:', err);
-            }
-        }
+                const endRow = currentRowIdx - 1;
+                return { startRow, endRow };
+            };
 
-        // Fallback: Blob 다운로드
-        try {
-            const parts = ['\uFEFF', buildCsvHeader(maxDatesCount)];
-            for (let i = 0; i < sorted.length; i++) {
-                parts.push(buildCsvLine(sorted[i]));
+            function awaitTick() {
+                setTimeout(() => {}, 0);
             }
 
-            const blob = new Blob(parts, { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
+            const minusRange = writeGroup(minusGroup, 'FFCC0000');
+            const plusRange = writeGroup(plusGroup, 'FF006600');
+            const otherRange = writeGroup(otherGroup, 'FF000000');
 
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = '손절요약_로그기반.csv';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
+            if (minusGroup.length > 0) {
+                summarySheet.addConditionalFormatting({
+                    ref: `B${minusRange.startRow}:B${minusRange.endRow}`,
+                    rules: [{
+                        type: 'dataBar',
+                        cfvo: [{ type: 'min', value: 0 }, { type: 'max' }],
+                        color: { argb: 'FFFF6B6B' },
+                        showValue: true,
+                        gradient: true
+                    }]
+                });
+            }
 
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-            setStatus('success', 'CSV 다운로드 완료');
+            if (plusGroup.length > 0) {
+                summarySheet.addConditionalFormatting({
+                    ref: `B${plusRange.startRow}:B${plusRange.endRow}`,
+                    rules: [{
+                        type: 'dataBar',
+                        cfvo: [{ type: 'min', value: 0 }, { type: 'max' }],
+                        color: { argb: 'FF6BFF8E' },
+                        showValue: true,
+                        gradient: true
+                    }]
+                });
+            }
+
+            if (otherGroup.length > 0) {
+                summarySheet.addConditionalFormatting({
+                    ref: `B${otherRange.startRow}:B${otherRange.endRow}`,
+                    rules: [{
+                        type: 'dataBar',
+                        cfvo: [{ type: 'min', value: 0 }, { type: 'max' }],
+                        color: { argb: 'FFD0D0D0' },
+                        showValue: true,
+                        gradient: true
+                    }]
+                });
+            }
+
+            summarySheet.eachRow((row) => {
+                row.eachCell((cell) => {
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+                        left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+                        bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+                        right: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+                    };
+                });
+            });
+
+            progressBar.style.width = '97%';
+            progressText.textContent = '엑셀 버퍼 생성 중...';
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob(
+                [buffer],
+                { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+            );
+
+            saveAs(blob, '손절요약_날짜정렬.xlsx');
+
+            progressBar.style.width = '100%';
+            progressText.textContent = '완료';
+            setStatus('success', '완료되었습니다! 손절 0개 코인 포함 / LOSS 기준 집계 완료');
         } catch (err) {
             console.error(err);
-            setStatus('error', 'CSV 생성 중 오류: ' + err.message);
+            setStatus('error', '엑셀 생성 중 오류: ' + err.message);
+        } finally {
+            processBtn.disabled = false;
+            downloadBtn.disabled = false;
         }
     }
 
@@ -877,7 +991,7 @@
     });
 
     processBtn.addEventListener('click', processFiles);
-    downloadBtn.addEventListener('click', downloadCsv);
+    downloadBtn.addEventListener('click', downloadExcel);
     clearBtn.addEventListener('click', clearAll);
 
     updateStats();
