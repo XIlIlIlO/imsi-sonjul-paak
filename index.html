@@ -3,865 +3,1100 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>손절 로그 요약기</title>
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-
+    <title>로그 기반 손절 요약기 (Memory Safe)</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.min.js"></script>
     <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #222;
+        }
+        .container {
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 26px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.3rem;
+        }
+        .header p {
+            margin: 8px 0 0 0;
+            opacity: 0.92;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 1080px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 22px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+        }
+        .card h2 {
+            margin: 0 0 16px 0;
+            font-size: 1.15rem;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
         .drop-zone {
-            transition: all 0.25s ease;
+            border: 2px dashed #cbd5e1;
+            border-radius: 14px;
+            padding: 26px 18px;
+            text-align: center;
+            background: #f8fafc;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
         }
+        .drop-zone:hover,
         .drop-zone.drag-over {
-            background-color: #eff6ff;
-            border-color: #2563eb;
-            transform: scale(1.01);
+            border-color: #667eea;
+            background: #eef2ff;
         }
-        .file-list-item {
-            animation: fadeIn 0.25s ease;
+        .drop-zone input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .muted {
+            color: #64748b;
+            font-size: 0.92rem;
+        }
+        .file-list {
+            max-height: 260px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            margin-top: 14px;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            border-bottom: 1px solid #eef2f7;
+            font-size: 0.92rem;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .btn {
+            width: 100%;
+            border: none;
+            border-radius: 12px;
+            padding: 13px 14px;
+            font-weight: 700;
+            font-size: 0.98rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 10px;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(102,126,234,0.35);
+        }
+        .btn-green {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+        }
+        .btn-green:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(34,197,94,0.35);
+        }
+        .btn-gray {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        .status {
+            margin-top: 12px;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 0.93rem;
+            min-height: 46px;
+            display: flex;
+            align-items: center;
+        }
+        .status.info {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+        .status.success {
+            background: #ecfdf5;
+            color: #15803d;
+        }
+        .status.error {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+        .progress-wrap {
+            display: none;
+            margin-top: 14px;
+        }
+        .progress-bg {
+            width: 100%;
+            height: 10px;
+            background: #e5e7eb;
+            border-radius: 999px;
+            overflow: hidden;
         }
         .progress-bar {
-            transition: width 0.2s ease;
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.15s ease;
         }
-        .preview-bar {
-            transition: width 0.25s ease;
+        .progress-text {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #6b7280;
+            word-break: break-all;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        @media (max-width: 900px) {
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 560px) {
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
+        .stat-card {
+            background: white;
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+        }
+        .stat-label {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-top: 8px;
+        }
+        .preview-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+        .preview-note {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        select {
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.94rem;
+            background: white;
+        }
+        .table-wrap {
+            overflow-x: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 880px;
+            background: white;
+        }
+        th, td {
+            border-bottom: 1px solid #edf2f7;
+            padding: 12px 12px;
+            text-align: left;
+            vertical-align: top;
+            font-size: 0.92rem;
+        }
+        th {
+            background: #f8fafc;
+            font-weight: 800;
+            color: #334155;
         }
         .mono {
             font-variant-numeric: tabular-nums;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
+        .tag {
+            display: inline-block;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .tag-minus {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        .tag-plus {
+            background: #dcfce7;
+            color: #15803d;
+        }
+        .tag-other {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        .bar-bg {
+            width: 220px;
+            max-width: 100%;
+            height: 28px;
+            border-radius: 999px;
+            background: #eef2f7;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+        .bar-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+        }
+        .bar-red { background: linear-gradient(90deg, #fca5a5, #ef4444); }
+        .bar-green { background: linear-gradient(90deg, #86efac, #22c55e); }
+        .bar-gray { background: linear-gradient(90deg, #d1d5db, #9ca3af); }
+        .bar-text {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            font-weight: 800;
+            color: #111827;
+        }
+        .empty {
+            background: white;
+            border-radius: 14px;
+            padding: 42px 18px;
+            text-align: center;
+            color: #64748b;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+        }
+        .small {
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+        .danger-note {
+            margin-top: 12px;
+            background: #fffbeb;
+            color: #92400e;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 0.88rem;
+            line-height: 1.55;
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen text-gray-800">
-    <div class="max-w-7xl mx-auto px-4 py-8">
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-bold tracking-tight">📊 로그 기반 손절 요약기</h1>
-            <p class="text-sm text-gray-500 mt-2">
-                대용량 .log / .txt 파일을 스트리밍으로 읽어 그룹별 손절 횟수와 손절 시각을 정리합니다.
-            </p>
-        </div>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📊 로그 기반 손절 요약기</h1>
+        <p>대용량 .log / .txt 파일을 스트리밍으로 읽어 그룹별 손절 횟수와 손절 시각을 합산합니다.</p>
+    </div>
 
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <!-- 좌측 -->
-            <div class="xl:col-span-1 space-y-6">
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                    <h2 class="text-lg font-semibold mb-4">1. 로그 파일 업로드</h2>
+    <div class="grid">
+        <div>
+            <div class="card">
+                <h2>1. 로그 파일 업로드</h2>
 
-                    <div id="drop-zone" class="drop-zone relative border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center cursor-pointer hover:bg-gray-50">
-                        <input
-                            type="file"
-                            id="file-input"
-                            accept=".log,.txt"
-                            multiple
-                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
-                        <div class="pointer-events-none">
-                            <div class="text-4xl mb-2">🗂️</div>
-                            <div class="font-semibold">여기를 클릭하거나 파일을 드래그하세요</div>
-                            <div class="text-sm text-gray-500 mt-2">.log, .txt 파일 지원 / 여러 개 선택 가능</div>
-                        </div>
-                    </div>
-
-                    <div id="file-list-container" class="mt-5 hidden">
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="text-sm font-medium text-gray-700">
-                                선택된 파일 <span id="file-count" class="mono">0</span>개
-                            </div>
-                            <button
-                                id="clear-btn"
-                                type="button"
-                                class="text-xs text-red-500 hover:text-red-700 underline"
-                            >
-                                초기화
-                            </button>
-                        </div>
-                        <div id="file-list" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
-                    </div>
+                <div class="drop-zone" id="dropZone">
+                    <input type="file" id="fileInput" accept=".log,.txt" multiple />
+                    <div style="font-size: 2rem;">🗂️</div>
+                    <div style="font-weight: 700; margin-top: 6px;">여기를 클릭하거나 파일을 드래그하세요</div>
+                    <div class="muted" style="margin-top: 8px;">여러 개 선택 가능 / .log, .txt 지원</div>
                 </div>
 
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                    <h2 class="text-lg font-semibold mb-4">2. 실행</h2>
+                <div class="file-list" id="fileList" style="display:none;"></div>
 
-                    <div class="space-y-3">
-                        <button
-                            id="process-btn"
-                            type="button"
-                            disabled
-                            class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-3 rounded-xl transition"
-                        >
-                            <span id="btn-text">분석 시작</span>
-                        </button>
+                <button class="btn btn-primary" id="processBtn" disabled>분석 시작</button>
+                <button class="btn btn-green" id="downloadBtn" disabled>요약 엑셀 다운로드</button>
+                <button class="btn btn-gray" id="clearBtn">초기화</button>
 
-                        <button
-                            id="download-btn"
-                            type="button"
-                            disabled
-                            class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-semibold py-3 rounded-xl transition"
-                        >
-                            요약 엑셀 다운로드
-                        </button>
+                <div class="status info" id="statusBox">파일을 선택하면 분석을 시작할 수 있습니다.</div>
+
+                <div class="progress-wrap" id="progressWrap">
+                    <div class="progress-bg">
+                        <div class="progress-bar" id="progressBar"></div>
                     </div>
+                    <div class="progress-text mono" id="progressText">0%</div>
+                </div>
 
-                    <div id="status-box" class="mt-4 text-sm rounded-xl px-4 py-3 bg-blue-50 text-blue-700">
-                        파일을 선택하면 분석을 시작할 수 있습니다.
-                    </div>
+                <div class="danger-note">
+                    파싱 중에는 청크 단위 문자열만 들고 가도록 구성했고, 결과 미리보기는 상위 일부만 그려서 DOM 메모리도 억제했다.
+                    전체 손절일은 엑셀 다운로드 시점에만 시트 데이터로 생성된다.
+                </div>
+            </div>
+        </div>
 
-                    <div id="progress-wrap" class="mt-4 hidden">
-                        <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div id="progress-bar" class="progress-bar h-full w-0 bg-blue-600"></div>
-                        </div>
-                        <div id="progress-text" class="text-xs text-gray-500 mt-2 mono">0%</div>
-                    </div>
-
-                    <div class="mt-5 text-xs text-gray-500 leading-5">
-                        <div>• 손절 횟수: <span class="font-medium">[Backtest Report]</span> 기준 합산</div>
-                        <div>• 손절 시각: <span class="font-medium">[Close] + LOSS + GROUP</span> 기준 수집</div>
-                        <div>• 무손절 그룹도 결과에 포함</div>
-                    </div>
+        <div>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-label">총 그룹 수</div>
+                    <div class="stat-value mono" id="statGroups">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">총 손절 횟수</div>
+                    <div class="stat-value mono" id="statLosses">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">손절 시각 개수</div>
+                    <div class="stat-value mono" id="statDates">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">처리 파일 수</div>
+                    <div class="stat-value mono" id="statFiles">0</div>
                 </div>
             </div>
 
-            <!-- 우측 -->
-            <div class="xl:col-span-2 space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-                        <div class="text-sm text-gray-500">총 그룹 수</div>
-                        <div id="stat-groups" class="text-2xl font-bold mt-2 mono">0</div>
+            <div class="card">
+                <div class="preview-toolbar">
+                    <div>
+                        <h2 style="margin-bottom:6px;">결과 미리보기</h2>
+                        <div class="preview-note">메모리 보호를 위해 화면에는 최대 200개 그룹만 렌더링하고, 날짜도 앞부분 일부만 보여준다.</div>
                     </div>
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-                        <div class="text-sm text-gray-500">총 손절 횟수</div>
-                        <div id="stat-losses" class="text-2xl font-bold mt-2 mono">0</div>
-                    </div>
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-                        <div class="text-sm text-gray-500">손절 시각 개수</div>
-                        <div id="stat-dates" class="text-2xl font-bold mt-2 mono">0</div>
-                    </div>
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-                        <div class="text-sm text-gray-500">처리 파일 수</div>
-                        <div id="stat-files" class="text-2xl font-bold mt-2 mono">0</div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <select id="sortMode">
+                            <option value="default">기본 정렬(부호별 + 횟수)</option>
+                            <option value="count-desc">손절횟수 내림차순</option>
+                            <option value="name-asc">이름 오름차순</option>
+                        </select>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                    <div class="flex items-center justify-between gap-4 flex-wrap">
-                        <div>
-                            <h2 class="text-lg font-semibold">결과 미리보기</h2>
-                            <p class="text-sm text-gray-500 mt-1">
-                                그룹명 기준으로 합산되며, 같은 그룹이 여러 파일/여러 백테스트에 있으면 모두 누적됩니다.
-                            </p>
-                        </div>
+                <div class="empty" id="emptyBox">아직 분석된 데이터가 없습니다.</div>
 
-                        <div class="flex items-center gap-2">
-                            <label for="sort-mode" class="text-sm text-gray-600">정렬</label>
-                            <select id="sort-mode" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                                <option value="default">기본 정렬(부호별 + 횟수)</option>
-                                <option value="count-desc">손절횟수 내림차순</option>
-                                <option value="name-asc">이름 오름차순</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div id="result-empty" class="mt-6 rounded-xl bg-gray-50 border border-gray-200 p-8 text-center text-gray-500">
-                        아직 분석된 데이터가 없습니다.
-                    </div>
-
-                    <div id="result-table-wrap" class="mt-6 hidden overflow-x-auto">
-                        <table class="min-w-full border border-gray-200 rounded-xl overflow-hidden">
-                            <thead class="bg-gray-100">
-                                <tr>
-                                    <th class="text-left text-sm font-semibold px-4 py-3 border-b border-gray-200">Group Name</th>
-                                    <th class="text-left text-sm font-semibold px-4 py-3 border-b border-gray-200">손절횟수</th>
-                                    <th class="text-left text-sm font-semibold px-4 py-3 border-b border-gray-200">손절일 개수</th>
-                                    <th class="text-left text-sm font-semibold px-4 py-3 border-b border-gray-200">손절일 목록</th>
-                                </tr>
-                            </thead>
-                            <tbody id="result-body"></tbody>
-                        </table>
-                    </div>
+                <div class="table-wrap" id="tableWrap" style="display:none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Group Name</th>
+                                <th>분류</th>
+                                <th>손절횟수</th>
+                                <th>손절일 개수</th>
+                                <th>손절일 미리보기</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultBody"></tbody>
+                    </table>
                 </div>
+
+                <div class="small" style="margin-top:12px;" id="previewMeta"></div>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
-        const selectedFiles = [];
-        let summaryMap = new Map();
-        let cachedSummaryData = [];
+<script>
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+    const PREVIEW_LIMIT = 200;
+    const PREVIEW_DATES_LIMIT = 5;
 
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        const fileListContainer = document.getElementById('file-list-container');
-        const fileList = document.getElementById('file-list');
-        const fileCount = document.getElementById('file-count');
-        const clearBtn = document.getElementById('clear-btn');
+    let selectedFiles = [];
+    let summaryMap = new Map();
+    let summaryDataCache = [];
 
-        const processBtn = document.getElementById('process-btn');
-        const downloadBtn = document.getElementById('download-btn');
-        const btnText = document.getElementById('btn-text');
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const fileList = document.getElementById('fileList');
+    const processBtn = document.getElementById('processBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const statusBox = document.getElementById('statusBox');
+    const progressWrap = document.getElementById('progressWrap');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
 
-        const statusBox = document.getElementById('status-box');
-        const progressWrap = document.getElementById('progress-wrap');
-        const progressBar = document.getElementById('progress-bar');
-        const progressText = document.getElementById('progress-text');
+    const statGroups = document.getElementById('statGroups');
+    const statLosses = document.getElementById('statLosses');
+    const statDates = document.getElementById('statDates');
+    const statFiles = document.getElementById('statFiles');
 
-        const statGroups = document.getElementById('stat-groups');
-        const statLosses = document.getElementById('stat-losses');
-        const statDates = document.getElementById('stat-dates');
-        const statFiles = document.getElementById('stat-files');
+    const sortMode = document.getElementById('sortMode');
+    const emptyBox = document.getElementById('emptyBox');
+    const tableWrap = document.getElementById('tableWrap');
+    const resultBody = document.getElementById('resultBody');
+    const previewMeta = document.getElementById('previewMeta');
 
-        const resultEmpty = document.getElementById('result-empty');
-        const resultTableWrap = document.getElementById('result-table-wrap');
-        const resultBody = document.getElementById('result-body');
-        const sortMode = document.getElementById('sort-mode');
+    function setStatus(type, message) {
+        statusBox.className = 'status ' + type;
+        statusBox.textContent = message;
+    }
 
-        function setStatus(type, message) {
-            const classes = {
-                info: 'bg-blue-50 text-blue-700',
-                success: 'bg-emerald-50 text-emerald-700',
-                error: 'bg-red-50 text-red-700',
-                warning: 'bg-amber-50 text-amber-700'
+    function humanFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+        return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    function cleanNumber(valueStr) {
+        if (valueStr == null) return 0;
+        if (typeof valueStr === 'number') return valueStr;
+        const cleanStr = String(valueStr).replace(/[^\d.-]/g, '');
+        const num = parseFloat(cleanStr);
+        return Number.isFinite(num) ? num : 0;
+    }
+
+    function normalizeGroupName(name) {
+        return String(name || '').trim();
+    }
+
+    function normalizeLossDate(dateStr) {
+        return String(dateStr || '').trim();
+    }
+
+    function classifyGroup(name) {
+        if (name.includes('-')) return 'minus';
+        if (name.includes('+')) return 'plus';
+        return 'other';
+    }
+
+    function groupTypeTag(type) {
+        if (type === 'minus') return '<span class="tag tag-minus">minus</span>';
+        if (type === 'plus') return '<span class="tag tag-plus">plus</span>';
+        return '<span class="tag tag-other">other</span>';
+    }
+
+    function ensureGroupEntry(groupName) {
+        const normalized = normalizeGroupName(groupName);
+        if (!normalized) return null;
+
+        if (!summaryMap.has(normalized)) {
+            summaryMap.set(normalized, {
+                name: normalized,
+                type: classifyGroup(normalized),
+                count: 0,
+                dates: [],
+                reportHits: 0,
+                lossLogHits: 0
+            });
+        }
+        return summaryMap.get(normalized);
+    }
+
+    function addReportCount(groupName, count) {
+        const entry = ensureGroupEntry(groupName);
+        if (!entry) return;
+        entry.count += Number(count) || 0;
+        entry.reportHits += 1;
+    }
+
+    function addLossDate(groupName, dateStr) {
+        const entry = ensureGroupEntry(groupName);
+        if (!entry) return;
+        const normalized = normalizeLossDate(dateStr);
+        if (!normalized) return;
+        entry.dates.push(normalized);
+        entry.lossLogHits += 1;
+    }
+
+    class StreamLogParser {
+        constructor() {
+            this.report = null;
+            this.closeBlock = null;
+        }
+
+        isHeaderLine(line) {
+            return /^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2},\d{3}\]\[/.test(line);
+        }
+
+        resetReport() {
+            this.report = null;
+        }
+
+        resetClose() {
+            this.closeBlock = null;
+        }
+
+        finalizeReport() {
+            if (this.report && this.report.groupName) {
+                addReportCount(this.report.groupName, this.report.lossCount || 0);
+            }
+            this.report = null;
+        }
+
+        finalizeClose() {
+            if (
+                this.closeBlock &&
+                this.closeBlock.isLoss &&
+                this.closeBlock.groupName &&
+                this.closeBlock.dateTime
+            ) {
+                addLossDate(this.closeBlock.groupName, this.closeBlock.dateTime);
+            }
+            this.closeBlock = null;
+        }
+
+        finalizeAll() {
+            this.finalizeReport();
+            this.finalizeClose();
+        }
+
+        startReport() {
+            this.finalizeReport();
+            this.report = {
+                groupName: '',
+                lossCount: 0
             };
-            statusBox.className = `mt-4 text-sm rounded-xl px-4 py-3 ${classes[type] || classes.info}`;
-            statusBox.textContent = message;
         }
 
-        function humanFileSize(bytes) {
-            if (bytes < 1024) return `${bytes} B`;
-            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-            if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-            return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+        startClose() {
+            this.finalizeClose();
+            this.closeBlock = {
+                dateTime: '',
+                isLoss: false,
+                groupName: ''
+            };
         }
 
-        function escapeHtml(value) {
-            return String(value)
-                .replaceAll('&', '&amp;')
-                .replaceAll('<', '&lt;')
-                .replaceAll('>', '&gt;')
-                .replaceAll('"', '&quot;')
-                .replaceAll("'", '&#39;');
-        }
+        handleHeader(line) {
+            this.finalizeClose();
 
-        function classifyGroup(name) {
-            if (name.includes('-')) return 'minus';
-            if (name.includes('+')) return 'plus';
-            return 'other';
-        }
-
-        function normalizeGroupName(name) {
-            return String(name || '').trim();
-        }
-
-        function normalizeLossDate(dateStr) {
-            return String(dateStr || '').trim();
-        }
-
-        function ensureGroupEntry(groupName) {
-            const normalized = normalizeGroupName(groupName);
-            if (!normalized) return null;
-
-            if (!summaryMap.has(normalized)) {
-                summaryMap.set(normalized, {
-                    name: normalized,
-                    count: 0,
-                    dates: [],
-                    type: classifyGroup(normalized),
-                    reportOccurrences: 0,
-                    lossEventsFound: 0
-                });
-            }
-            return summaryMap.get(normalized);
-        }
-
-        function addReportCount(groupName, lossCount) {
-            const entry = ensureGroupEntry(groupName);
-            if (!entry) return;
-            entry.count += Number(lossCount) || 0;
-            entry.reportOccurrences += 1;
-            entry.type = classifyGroup(entry.name);
-        }
-
-        function addLossDate(groupName, dateStr) {
-            const entry = ensureGroupEntry(groupName);
-            if (!entry) return;
-            const normalized = normalizeLossDate(dateStr);
-            if (!normalized) return;
-            entry.dates.push(normalized);
-            entry.lossEventsFound += 1;
-            entry.type = classifyGroup(entry.name);
-        }
-
-        function cleanNumber(text) {
-            if (text == null) return 0;
-            if (typeof text === 'number') return text;
-            const cleaned = String(text).replace(/[^\d.-]/g, '');
-            const num = parseFloat(cleaned);
-            return Number.isFinite(num) ? num : 0;
-        }
-
-        class StreamLogParser {
-            constructor() {
-                this.inReport = false;
-                this.currentReport = null;
-                this.currentClose = null;
-            }
-
-            finalizeReport() {
-                if (this.currentReport && this.currentReport.groupName) {
-                    addReportCount(this.currentReport.groupName, this.currentReport.lossCount || 0);
+            if (line.includes('[Backtest Report]')) {
+                if (line.includes('백테스팅 합산 결과')) {
+                    this.finalizeReport();
+                    this.report = null;
+                } else {
+                    this.startReport();
                 }
-                this.inReport = false;
-                this.currentReport = null;
+                return;
             }
 
-            finalizeClose() {
-                if (
-                    this.currentClose &&
-                    this.currentClose.isLoss &&
-                    this.currentClose.groupName &&
-                    this.currentClose.dateTime
-                ) {
-                    addLossDate(this.currentClose.groupName, this.currentClose.dateTime);
-                }
-                this.currentClose = null;
-            }
-
-            finalizeAll() {
+            if (this.report) {
                 this.finalizeReport();
-                this.finalizeClose();
             }
 
-            isHeaderLine(line) {
-                return /^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2},\d{3}\]\[/.test(line);
-            }
-
-            handleHeaderLine(line) {
-                // 새로운 로그 헤더가 오면 이전 close 블록은 종료
-                this.finalizeClose();
-
-                if (line.includes('[Backtest Report]')) {
-                    this.finalizeReport();
-
-                    // 합산 결과 블록은 제외
-                    if (!line.includes('백테스팅 합산 결과')) {
-                        this.inReport = true;
-                        this.currentReport = {
-                            groupName: '',
-                            lossCount: 0
-                        };
-                    }
-                    return;
-                }
-
-                // 다른 헤더가 나오면 report 블록도 종료
-                if (this.inReport) {
-                    this.finalizeReport();
-                }
-
-                if (line.includes('[Close]')) {
-                    this.currentClose = {
-                        dateTime: '',
-                        isLoss: false,
-                        groupName: ''
-                    };
-                }
-            }
-
-            parseReportLine(line) {
-                if (!this.inReport || !this.currentReport) return;
-
-                let match = line.match(/^-+\s*Group Name\s*:\s*(.+)$/i);
-                if (match) {
-                    this.currentReport.groupName = normalizeGroupName(match[1]);
-                    return;
-                }
-
-                match = line.match(/^-+\s*총 손절 회수\s*:\s*(.+)$/i);
-                if (match) {
-                    this.currentReport.lossCount = cleanNumber(match[1]);
-                }
-            }
-
-            parseCloseLine(line) {
-                if (!this.currentClose) return;
-
-                if (!this.currentClose.dateTime) {
-                    const matchDate = line.match(/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})$/);
-                    if (matchDate) {
-                        this.currentClose.dateTime = matchDate[1];
-                        return;
-                    }
-                }
-
-                if (!this.currentClose.isLoss && /□\s*LOSS\s*\[\d+\]/i.test(line)) {
-                    this.currentClose.isLoss = true;
-                    return;
-                }
-
-                if (!this.currentClose.groupName) {
-                    let matchGroup = line.match(/^-+\s*GROUP\s*:\s*(.+)$/i);
-                    if (!matchGroup) {
-                        matchGroup = line.match(/^Group\s*:\s*(.+)$/i);
-                    }
-
-                    if (matchGroup) {
-                        this.currentClose.groupName = normalizeGroupName(matchGroup[1]);
-
-                        if (
-                            this.currentClose.isLoss &&
-                            this.currentClose.dateTime &&
-                            this.currentClose.groupName
-                        ) {
-                            addLossDate(this.currentClose.groupName, this.currentClose.dateTime);
-                            this.currentClose = null;
-                        }
-                    }
-                }
-            }
-
-            parseLine(rawLine) {
-                const line = String(rawLine ?? '').replace(/\r$/, '');
-                if (!line.trim()) return;
-
-                if (this.isHeaderLine(line)) {
-                    this.handleHeaderLine(line.trim());
-                    return;
-                }
-
-                const trimmed = line.trim();
-                this.parseReportLine(trimmed);
-                this.parseCloseLine(trimmed);
+            if (line.includes('[Close]')) {
+                this.startClose();
+                return;
             }
         }
 
-        function handleFiles(fileListLike) {
-            const files = Array.from(fileListLike || []);
-            if (!files.length) return;
+        parseReportLine(line) {
+            if (!this.report) return;
 
-            for (const file of files) {
-                selectedFiles.push(file);
+            let match = line.match(/^-+\s*Group Name\s*:\s*(.+)$/i);
+            if (match) {
+                this.report.groupName = normalizeGroupName(match[1]);
+                return;
             }
-            updateFileList();
+
+            match = line.match(/^-+\s*총 손절 회수\s*:\s*(.+)$/i);
+            if (match) {
+                this.report.lossCount = cleanNumber(match[1]);
+                return;
+            }
         }
 
-        function clearFiles() {
-            selectedFiles.length = 0;
-            summaryMap = new Map();
-            cachedSummaryData = [];
+        parseCloseLine(line) {
+            if (!this.closeBlock) return;
 
-            fileInput.value = '';
-            updateFileList();
-            updateStats([]);
-            renderPreview([]);
+            if (!this.closeBlock.dateTime) {
+                const matchDate = line.match(/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})$/);
+                if (matchDate) {
+                    this.closeBlock.dateTime = matchDate[1];
+                    return;
+                }
+            }
 
-            processBtn.disabled = true;
-            downloadBtn.disabled = true;
-            btnText.textContent = '분석 시작';
-            setStatus('info', '파일을 선택하면 분석을 시작할 수 있습니다.');
-            progressWrap.classList.add('hidden');
-            progressBar.style.width = '0%';
-            progressText.textContent = '0%';
+            if (!this.closeBlock.isLoss && /□\s*LOSS\s*\[\d+\]/i.test(line)) {
+                this.closeBlock.isLoss = true;
+                return;
+            }
+
+            if (!this.closeBlock.groupName) {
+                let matchGroup = line.match(/^-+\s*GROUP\s*:\s*(.+)$/i);
+                if (!matchGroup) {
+                    matchGroup = line.match(/^Group\s*:\s*(.+)$/i);
+                }
+                if (!matchGroup) {
+                    matchGroup = line.match(/^-+\s*GROUP\s*:\s*(.+?)\s*$/i);
+                }
+
+                if (matchGroup) {
+                    this.closeBlock.groupName = normalizeGroupName(matchGroup[1]);
+
+                    if (this.closeBlock.isLoss && this.closeBlock.dateTime) {
+                        addLossDate(this.closeBlock.groupName, this.closeBlock.dateTime);
+                        this.closeBlock = null;
+                    }
+                }
+            }
         }
 
-        function updateFileList() {
+        parseLine(rawLine) {
+            const line = String(rawLine || '').replace(/\r$/, '');
+            if (!line.trim()) return;
+
+            if (this.isHeaderLine(line)) {
+                this.handleHeader(line.trim());
+                return;
+            }
+
+            const trimmed = line.trim();
+            this.parseReportLine(trimmed);
+            this.parseCloseLine(trimmed);
+        }
+    }
+
+    function handleFiles(files) {
+        const arr = Array.from(files || []);
+        if (!arr.length) return;
+
+        for (const file of arr) {
+            selectedFiles.push(file);
+        }
+
+        renderFileList();
+        processBtn.disabled = selectedFiles.length === 0;
+        downloadBtn.disabled = true;
+        setStatus('info', `${selectedFiles.length}개 파일이 선택되었습니다.`);
+    }
+
+    function renderFileList() {
+        if (!selectedFiles.length) {
+            fileList.style.display = 'none';
             fileList.innerHTML = '';
-            fileCount.textContent = String(selectedFiles.length);
+            return;
+        }
 
-            if (selectedFiles.length === 0) {
-                fileListContainer.classList.add('hidden');
-                processBtn.disabled = true;
-                return;
-            }
-
-            fileListContainer.classList.remove('hidden');
-            processBtn.disabled = false;
-
-            selectedFiles.forEach((file, index) => {
-                const item = document.createElement('div');
-                item.className = 'file-list-item flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50';
-                item.innerHTML = `
-                    <div class="min-w-0">
-                        <div class="text-sm font-medium text-gray-700 truncate">${escapeHtml(file.name)}</div>
-                        <div class="text-xs text-gray-400 mt-1 mono">${index + 1}</div>
+        fileList.style.display = 'block';
+        fileList.innerHTML = selectedFiles.map((file, idx) => `
+            <div class="file-item">
+                <div style="min-width:0;">
+                    <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        ${escapeHtml(file.name)}
                     </div>
-                    <div class="text-xs text-gray-500 whitespace-nowrap mono">${humanFileSize(file.size)}</div>
-                `;
-                fileList.appendChild(item);
-            });
-        }
-
-        async function processFiles() {
-            if (!selectedFiles.length) return;
-
-            summaryMap = new Map();
-            cachedSummaryData = [];
-            renderPreview([]);
-            updateStats([]);
-
-            processBtn.disabled = true;
-            downloadBtn.disabled = true;
-            btnText.textContent = '분석 중...';
-            progressWrap.classList.remove('hidden');
-            progressBar.style.width = '0%';
-            progressText.textContent = '0%';
-            setStatus('info', '대용량 로그를 스트리밍으로 읽는 중입니다.');
-
-            try {
-                for (let fileIndex = 0; fileIndex < selectedFiles.length; fileIndex += 1) {
-                    const file = selectedFiles[fileIndex];
-                    await processSingleFile(file, fileIndex, selectedFiles.length);
-                }
-
-                cachedSummaryData = buildSummaryData();
-                updateStats(cachedSummaryData);
-                renderPreview(cachedSummaryData);
-
-                processBtn.disabled = false;
-                downloadBtn.disabled = false;
-                btnText.textContent = '재분석';
-                setStatus('success', `분석 완료: ${cachedSummaryData.length}개 그룹이 집계되었습니다.`);
-            } catch (error) {
-                console.error(error);
-                processBtn.disabled = false;
-                btnText.textContent = '분석 시작';
-                downloadBtn.disabled = true;
-                setStatus('error', `분석 중 오류: ${error.message}`);
-            }
-        }
-
-        function processSingleFile(file, fileIndex, totalFiles) {
-            return new Promise((resolve, reject) => {
-                const parser = new StreamLogParser();
-                const reader = new FileReader();
-
-                let offset = 0;
-                let leftover = '';
-                const fileSize = file.size;
-
-                function readNextChunk() {
-                    const blob = file.slice(offset, offset + CHUNK_SIZE);
-                    reader.readAsText(blob, 'UTF-8');
-                }
-
-                reader.onload = (event) => {
-                    try {
-                        const chunkText = event.target.result || '';
-                        let text = leftover + chunkText;
-                        let start = 0;
-                        let newlineIndex = 0;
-
-                        while ((newlineIndex = text.indexOf('\n', start)) !== -1) {
-                            const rawLine = text.slice(start, newlineIndex);
-                            parser.parseLine(rawLine);
-                            start = newlineIndex + 1;
-                        }
-
-                        leftover = text.slice(start);
-                        text = null;
-
-                        offset += CHUNK_SIZE;
-
-                        const filePercent = Math.min(100, Math.round((offset / fileSize) * 100));
-                        const totalPercent = Math.min(
-                            100,
-                            Math.round(((fileIndex + filePercent / 100) / totalFiles) * 100)
-                        );
-
-                        progressBar.style.width = `${totalPercent}%`;
-                        progressText.textContent = `파일 ${fileIndex + 1}/${totalFiles} · ${file.name} · ${filePercent}%`;
-
-                        if (offset < fileSize) {
-                            setTimeout(readNextChunk, 0);
-                        } else {
-                            if (leftover.trim()) {
-                                parser.parseLine(leftover);
-                            }
-                            parser.finalizeAll();
-                            resolve();
-                        }
-                    } catch (err) {
-                        reject(err);
-                    }
-                };
-
-                reader.onerror = () => {
-                    reject(reader.error || new Error(`${file.name} 읽기 실패`));
-                };
-
-                readNextChunk();
-            });
-        }
-
-        function buildSummaryData() {
-            const result = [];
-
-            summaryMap.forEach((entry) => {
-                const sortedDates = [...entry.dates].sort((a, b) => a.localeCompare(b));
-
-                result.push({
-                    name: entry.name,
-                    count: entry.count,
-                    dates: sortedDates,
-                    type: entry.type,
-                    reportOccurrences: entry.reportOccurrences,
-                    lossEventsFound: entry.lossEventsFound
-                });
-            });
-
-            return sortSummaryData(result, sortMode.value);
-        }
-
-        function sortSummaryData(data, mode) {
-            const arr = [...data];
-
-            if (mode === 'count-desc') {
-                return arr.sort((a, b) => {
-                    if (b.count !== a.count) return b.count - a.count;
-                    return a.name.localeCompare(b.name);
-                });
-            }
-
-            if (mode === 'name-asc') {
-                return arr.sort((a, b) => a.name.localeCompare(b.name));
-            }
-
-            const minus = arr
-                .filter((d) => d.type === 'minus')
-                .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
-
-            const plus = arr
-                .filter((d) => d.type === 'plus')
-                .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
-
-            const other = arr
-                .filter((d) => d.type === 'other')
-                .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
-
-            return [...minus, ...plus, ...other];
-        }
-
-        function updateStats(data) {
-            const totalGroups = data.length;
-            const totalLosses = data.reduce((sum, item) => sum + (item.count || 0), 0);
-            const totalDates = data.reduce((sum, item) => sum + item.dates.length, 0);
-
-            statGroups.textContent = String(totalGroups);
-            statLosses.textContent = String(totalLosses);
-            statDates.textContent = String(totalDates);
-            statFiles.textContent = String(selectedFiles.length);
-        }
-
-        function renderPreview(data) {
-            resultBody.innerHTML = '';
-
-            if (!data.length) {
-                resultEmpty.classList.remove('hidden');
-                resultTableWrap.classList.add('hidden');
-                return;
-            }
-
-            resultEmpty.classList.add('hidden');
-            resultTableWrap.classList.remove('hidden');
-
-            const maxCount = Math.max(...data.map((d) => d.count), 0);
-
-            data.forEach((item) => {
-                const tr = document.createElement('tr');
-                tr.className = 'border-b border-gray-200 align-top';
-
-                const barColor =
-                    item.type === 'minus' ? 'bg-red-400' :
-                    item.type === 'plus' ? 'bg-emerald-400' :
-                    'bg-gray-400';
-
-                const nameColor =
-                    item.type === 'minus' ? 'text-red-700' :
-                    item.type === 'plus' ? 'text-emerald-700' :
-                    'text-gray-800';
-
-                const widthPercent = maxCount > 0 ? (item.count / maxCount) * 100 : 0;
-
-                const dateText = item.dates.length
-                    ? item.dates.map(escapeHtml).join('<br>')
-                    : '<span class="text-gray-400">없음</span>';
-
-                tr.innerHTML = `
-                    <td class="px-4 py-4 text-sm font-semibold ${nameColor}">
-                        ${escapeHtml(item.name)}
-                    </td>
-                    <td class="px-4 py-4 text-sm">
-                        <div class="w-56 max-w-full">
-                            <div class="relative h-8 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-                                <div class="preview-bar absolute left-0 top-0 h-full ${barColor}" style="width:${widthPercent}%"></div>
-                                <div class="relative z-10 h-full flex items-center justify-center font-semibold mono text-gray-800">
-                                    ${item.count}
-                                </div>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="px-4 py-4 text-sm mono">
-                        ${item.dates.length}
-                    </td>
-                    <td class="px-4 py-4 text-sm leading-6 whitespace-nowrap mono">
-                        ${dateText}
-                    </td>
-                `;
-
-                resultBody.appendChild(tr);
-            });
-        }
-
-        async function downloadExcel() {
-            if (!cachedSummaryData.length) return;
-
-            const workbook = new ExcelJS.Workbook();
-            const sheet = workbook.addWorksheet('손절요약시트');
-
-            sheet.views = [{ state: 'frozen', ySplit: 1 }];
-
-            const maxDatesCount = Math.max(...cachedSummaryData.map((d) => d.dates.length), 0);
-
-            sheet.columns = [
-                { header: 'Group Name', key: 'name', width: 28 },
-                { header: '손절횟수', key: 'count', width: 14 },
-                { header: '', key: 'spacer', width: 3 }
-            ];
-
-            for (let i = 0; i < maxDatesCount; i += 1) {
-                sheet.getColumn(4 + i).width = 22;
-                sheet.getCell(1, 4 + i).value = `손절일 ${i + 1}`;
-            }
-
-            const headerRow = sheet.getRow(1);
-            headerRow.height = 22;
-            headerRow.eachCell((cell) => {
-                cell.font = { bold: true };
-                cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                cell.fill = {
-                    type: 'pattern',
-                    pattern: 'solid',
-                    fgColor: { argb: 'FFF3F4F6' }
-                };
-                cell.border = {
-                    top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
-                    left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
-                    bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
-                    right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
-                };
-            });
-
-            let rowIndex = 2;
-
-            function writeGroupRows(groupData, nameArgb) {
-                const start = rowIndex;
-
-                groupData.forEach((item) => {
-                    const rowValues = [item.name, item.count, '', ...item.dates];
-                    const row = sheet.addRow(rowValues);
-
-                    row.getCell(1).font = { bold: true, color: { argb: nameArgb } };
-                    row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
-                    row.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
-
-                    const totalCols = 3 + maxDatesCount;
-                    for (let col = 1; col <= totalCols; col += 1) {
-                        const cell = row.getCell(col);
-                        if (col >= 4) {
-                            cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                        }
-                        cell.border = {
-                            top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
-                            left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
-                            bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
-                            right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
-                        };
-                    }
-
-                    rowIndex += 1;
-                });
-
-                return {
-                    start,
-                    end: rowIndex - 1
-                };
-            }
-
-            const minusGroup = cachedSummaryData.filter((d) => d.type === 'minus');
-            const plusGroup = cachedSummaryData.filter((d) => d.type === 'plus');
-            const otherGroup = cachedSummaryData.filter((d) => d.type === 'other');
-
-            const minusRange = writeGroupRows(minusGroup, 'FFB91C1C');
-            const plusRange = writeGroupRows(plusGroup, 'FF047857');
-            const otherRange = writeGroupRows(otherGroup, 'FF111827');
-
-            function addDataBar(range, argbColor) {
-                if (!range || range.start > range.end) return;
-                sheet.addConditionalFormatting({
-                    ref: `B${range.start}:B${range.end}`,
-                    rules: [
-                        {
-                            type: 'dataBar',
-                            cfvo: [
-                                { type: 'min' },
-                                { type: 'max' }
-                            ],
-                            color: { argb: argbColor },
-                            showValue: true,
-                            gradient: true
-                        }
-                    ]
-                });
-            }
-
-            addDataBar(minusRange, 'FFFF7B7B');
-            addDataBar(plusRange, 'FF6EE7B7');
-            addDataBar(otherRange, 'FFA3A3A3');
-
-            const buffer = await workbook.xlsx.writeBuffer();
-            const blob = new Blob(
-                [buffer],
-                { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
-            );
-
-            saveAs(blob, '손절요약_로그기반.xlsx');
-        }
-
-        // 이벤트
-        dropZone.addEventListener('dragover', (event) => {
-            event.preventDefault();
-            dropZone.classList.add('drag-over');
-        });
-
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('drag-over');
-        });
-
-        dropZone.addEventListener('drop', (event) => {
-            event.preventDefault();
-            dropZone.classList.remove('drag-over');
-            handleFiles(event.dataTransfer.files);
-        });
-
-        fileInput.addEventListener('change', (event) => {
-            handleFiles(event.target.files);
-        });
-
-        clearBtn.addEventListener('click', clearFiles);
-        processBtn.addEventListener('click', processFiles);
-        downloadBtn.addEventListener('click', downloadExcel);
-
-        sortMode.addEventListener('change', () => {
-            if (!summaryMap.size) return;
-            cachedSummaryData = buildSummaryData();
-            renderPreview(cachedSummaryData);
-        });
-
+                    <div class="small mono">${idx + 1}</div>
+                </div>
+                <div class="mono" style="white-space:nowrap;">${humanFileSize(file.size)}</div>
+            </div>
+        `).join('');
+    }
+
+    function resetResultState() {
+        summaryMap = new Map();
+        summaryDataCache = [];
         updateStats([]);
         renderPreview([]);
-    </script>
+        downloadBtn.disabled = true;
+    }
+
+    function clearAll() {
+        selectedFiles = [];
+        summaryMap = new Map();
+        summaryDataCache = [];
+        fileInput.value = '';
+        renderFileList();
+        updateStats([]);
+        renderPreview([]);
+        progressWrap.style.display = 'none';
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+        processBtn.disabled = true;
+        downloadBtn.disabled = true;
+        setStatus('info', '파일을 선택하면 분석을 시작할 수 있습니다.');
+    }
+
+    function sortSummaryData(data, mode) {
+        const arr = [...data];
+
+        if (mode === 'count-desc') {
+            return arr.sort((a, b) => {
+                if (b.count !== a.count) return b.count - a.count;
+                return a.name.localeCompare(b.name);
+            });
+        }
+
+        if (mode === 'name-asc') {
+            return arr.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        const minus = arr
+            .filter(x => x.type === 'minus')
+            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+
+        const plus = arr
+            .filter(x => x.type === 'plus')
+            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+
+        const other = arr
+            .filter(x => x.type === 'other')
+            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+
+        return [...minus, ...plus, ...other];
+    }
+
+    function buildSummaryData() {
+        const data = [];
+
+        summaryMap.forEach((entry) => {
+            entry.dates.sort((a, b) => a.localeCompare(b));
+            data.push({
+                name: entry.name,
+                type: entry.type,
+                count: entry.count,
+                dates: entry.dates,
+                reportHits: entry.reportHits,
+                lossLogHits: entry.lossLogHits
+            });
+        });
+
+        return sortSummaryData(data, sortMode.value);
+    }
+
+    function updateStats(data) {
+        const totalGroups = data.length;
+        const totalLosses = data.reduce((acc, cur) => acc + (cur.count || 0), 0);
+        const totalDates = data.reduce((acc, cur) => acc + cur.dates.length, 0);
+
+        statGroups.textContent = String(totalGroups);
+        statLosses.textContent = String(totalLosses);
+        statDates.textContent = String(totalDates);
+        statFiles.textContent = String(selectedFiles.length);
+    }
+
+    function renderPreview(data) {
+        resultBody.innerHTML = '';
+
+        if (!data.length) {
+            emptyBox.style.display = 'block';
+            tableWrap.style.display = 'none';
+            previewMeta.textContent = '';
+            return;
+        }
+
+        emptyBox.style.display = 'none';
+        tableWrap.style.display = 'block';
+
+        const previewRows = data.slice(0, PREVIEW_LIMIT);
+        const maxCount = Math.max(...previewRows.map(x => x.count), 0);
+
+        resultBody.innerHTML = previewRows.map(item => {
+            const widthPercent = maxCount > 0 ? Math.max(0, (item.count / maxCount) * 100) : 0;
+            const fillClass =
+                item.type === 'minus' ? 'bar-red' :
+                item.type === 'plus' ? 'bar-green' :
+                'bar-gray';
+
+            const datesPreview = item.dates.length
+                ? item.dates.slice(0, PREVIEW_DATES_LIMIT).map(d => escapeHtml(d)).join('<br>')
+                : '<span style="color:#9ca3af;">없음</span>';
+
+            const extraCount = item.dates.length > PREVIEW_DATES_LIMIT
+                ? `<div class="small" style="margin-top:6px;">외 ${item.dates.length - PREVIEW_DATES_LIMIT}개</div>`
+                : '';
+
+            return `
+                <tr>
+                    <td style="font-weight:700;">${escapeHtml(item.name)}</td>
+                    <td>${groupTypeTag(item.type)}</td>
+                    <td>
+                        <div class="bar-bg">
+                            <div class="bar-fill ${fillClass}" style="width:${widthPercent}%"></div>
+                            <div class="bar-text mono">${item.count}</div>
+                        </div>
+                    </td>
+                    <td class="mono">${item.dates.length}</td>
+                    <td class="mono">${datesPreview}${extraCount}</td>
+                </tr>
+            `;
+        }).join('');
+
+        previewMeta.textContent = `전체 ${data.length}개 그룹 중 ${Math.min(data.length, PREVIEW_LIMIT)}개만 화면에 표시 중`;
+    }
+
+    function applySheetStyle(ws, totalRowsCount, maxDatesCount) {
+        const totalCols = 3 + maxDatesCount;
+        ws['!cols'] = [
+            { wch: 24 },
+            { wch: 12 },
+            { wch: 3 }
+        ];
+
+        for (let i = 0; i < maxDatesCount; i++) {
+            ws['!cols'].push({ wch: 21 });
+        }
+
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const addr = XLSX.utils.encode_cell({ r: R, c: C });
+                if (!ws[addr]) continue;
+
+                const style = {
+                    font: { name: '맑은 고딕', sz: 11 },
+                    alignment: { vertical: 'center' },
+                    border: {
+                        top: { style: 'thin', color: { rgb: 'D1D5DB' } },
+                        bottom: { style: 'thin', color: { rgb: 'D1D5DB' } },
+                        left: { style: 'thin', color: { rgb: 'D1D5DB' } },
+                        right: { style: 'thin', color: { rgb: 'D1D5DB' } }
+                    }
+                };
+
+                if (R === 0) {
+                    style.font.bold = true;
+                    style.alignment.horizontal = 'center';
+                    style.fill = { fgColor: { rgb: 'F3F4F6' } };
+                } else {
+                    if (C === 0) style.alignment.horizontal = 'left';
+                    else if (C === 1 || C === 2) style.alignment.horizontal = 'center';
+                    else style.alignment.horizontal = 'center';
+                }
+
+                ws[addr].s = style;
+            }
+        }
+
+        for (let rowIndex = 1; rowIndex <= totalRowsCount; rowIndex++) {
+            const typeCell = ws[XLSX.utils.encode_cell({ r: rowIndex, c: 0 })];
+            if (!typeCell || !typeCell.v) continue;
+
+            const name = String(typeCell.v);
+            if (name.includes('-')) {
+                typeCell.s = typeCell.s || {};
+                typeCell.s.font = { ...(typeCell.s.font || {}), color: { rgb: 'B91C1C' }, bold: true };
+            } else if (name.includes('+')) {
+                typeCell.s = typeCell.s || {};
+                typeCell.s.font = { ...(typeCell.s.font || {}), color: { rgb: '15803D' }, bold: true };
+            } else {
+                typeCell.s = typeCell.s || {};
+                typeCell.s.font = { ...(typeCell.s.font || {}), color: { rgb: '111827' }, bold: true };
+            }
+        }
+    }
+
+    function downloadExcel() {
+        if (!summaryDataCache.length) return;
+
+        const workbook = XLSX.utils.book_new();
+
+        const maxDatesCount = summaryDataCache.reduce((max, item) => Math.max(max, item.dates.length), 0);
+
+        const headerRow = ['Group Name', '손절횟수', ''];
+        for (let i = 0; i < maxDatesCount; i++) {
+            headerRow.push(`손절일 ${i + 1}`);
+        }
+
+        const rows = [headerRow];
+
+        for (const item of summaryDataCache) {
+            const row = [item.name, item.count, ''];
+            if (item.dates.length) {
+                for (const d of item.dates) row.push(d);
+            }
+            rows.push(row);
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        applySheetStyle(ws, summaryDataCache.length, maxDatesCount);
+
+        XLSX.utils.book_append_sheet(workbook, ws, '손절요약시트');
+        XLSX.writeFile(workbook, '손절요약_로그기반_메모리안전버전.xlsx');
+    }
+
+    async function pause(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function processSingleFile(file, fileIndex, totalFiles) {
+        return new Promise((resolve, reject) => {
+            const fileSize = file.size;
+            let offset = 0;
+            let leftover = '';
+            let parser = new StreamLogParser();
+            let chunkReader = new FileReader();
+
+            function cleanup() {
+                if (chunkReader) {
+                    chunkReader.onload = null;
+                    chunkReader.onerror = null;
+                }
+                parser = null;
+                chunkReader = null;
+                leftover = null;
+            }
+
+            function readNextChunk() {
+                try {
+                    const slice = file.slice(offset, offset + CHUNK_SIZE);
+                    chunkReader.readAsText(slice, 'UTF-8');
+                } catch (err) {
+                    cleanup();
+                    reject(err);
+                }
+            }
+
+            chunkReader.onload = function(e) {
+                try {
+                    let chunkText = e.target.result || '';
+                    e.target.result = null;
+
+                    let data = leftover + chunkText;
+                    chunkText = null;
+
+                    let start = 0;
+                    let newLineIndex = 0;
+
+                    while ((newLineIndex = data.indexOf('\n', start)) !== -1) {
+                        const rawLine = data.substring(start, newLineIndex);
+                        if (rawLine.trim().length > 0) {
+                            parser.parseLine(rawLine);
+                        }
+                        start = newLineIndex + 1;
+                    }
+
+                    leftover = data.substring(start);
+                    data = null;
+
+                    offset += CHUNK_SIZE;
+                    const filePercent = Math.min(100, Math.round((offset / fileSize) * 100));
+                    const totalProgress = Math.min(
+                        100,
+                        Math.round(((fileIndex * 100) + filePercent) / totalFiles)
+                    );
+
+                    progressBar.style.width = totalProgress + '%';
+                    progressText.textContent = `파일 ${fileIndex + 1}/${totalFiles} · ${file.name} · ${filePercent}%`;
+
+                    if (offset < fileSize) {
+                        setTimeout(readNextChunk, 0);
+                    } else {
+                        if (leftover && leftover.trim().length > 0) {
+                            parser.parseLine(leftover);
+                        }
+                        parser.finalizeAll();
+                        cleanup();
+                        resolve();
+                    }
+                } catch (err) {
+                    cleanup();
+                    reject(err);
+                }
+            };
+
+            chunkReader.onerror = function() {
+                const err = chunkReader.error || new Error(file.name + ' 읽기 실패');
+                cleanup();
+                reject(err);
+            };
+
+            readNextChunk();
+        });
+    }
+
+    async function processFiles() {
+        if (!selectedFiles.length) return;
+
+        resetResultState();
+        processBtn.disabled = true;
+        downloadBtn.disabled = true;
+        progressWrap.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+        setStatus('info', '대용량 로그를 스트리밍으로 읽는 중입니다.');
+
+        try {
+            for (let i = 0; i < selectedFiles.length; i++) {
+                await processSingleFile(selectedFiles[i], i, selectedFiles.length);
+                progressText.textContent = `RAM 정리 중... (${i + 1}/${selectedFiles.length})`;
+                await pause(150);
+            }
+
+            summaryDataCache = buildSummaryData();
+            updateStats(summaryDataCache);
+            renderPreview(summaryDataCache);
+
+            downloadBtn.disabled = false;
+            processBtn.disabled = false;
+            setStatus('success', `분석 완료: ${summaryDataCache.length}개 그룹 집계 완료`);
+            progressBar.style.width = '100%';
+            progressText.textContent = '완료';
+        } catch (err) {
+            console.error(err);
+            processBtn.disabled = false;
+            downloadBtn.disabled = true;
+            setStatus('error', `오류 발생: ${err.message}`);
+        }
+    }
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+
+    processBtn.addEventListener('click', processFiles);
+    downloadBtn.addEventListener('click', downloadExcel);
+    clearBtn.addEventListener('click', clearAll);
+
+    sortMode.addEventListener('change', () => {
+        if (!summaryMap.size) return;
+        summaryDataCache = buildSummaryData();
+        renderPreview(summaryDataCache);
+    });
+
+    updateStats([]);
+    renderPreview([]);
+</script>
 </body>
 </html>
