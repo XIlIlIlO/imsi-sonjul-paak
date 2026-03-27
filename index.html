@@ -1214,16 +1214,25 @@
                 });
 
                 worksheet.columns.forEach((column, index) => {
+                    const colNumber = index + 1;
+
                     let maxLength = 0;
                     column.eachCell({ includeEmpty: true }, (cell) => {
                         const columnLength = cell.value ? cell.value.toString().length : 2;
                         if (columnLength > maxLength) maxLength = columnLength;
                     });
 
-                    if (index + 1 === spacerColIndex) {
+                    if (colNumber === spacerColIndex) {
                         column.width = 3;
+                    } else if (colNumber === 1) {
+                        // 그룹명 열: 글자 길이보다 4 정도 더
+                        column.width = Math.max(18, maxLength + 4);
+                    } else if (colNumber >= unrealizedStartColIndex) {
+                        // 미실현차수 열들: 글자 길이보다 4 정도 더
+                        column.width = Math.max(14, maxLength + 4);
                     } else {
-                        column.width = maxLength < 10 ? 10 : maxLength + 5;
+                        // 나머지 열
+                        column.width = Math.max(10, maxLength + 2);
                     }
                 });
 
