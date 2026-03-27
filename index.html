@@ -1146,7 +1146,7 @@
                 const minUnrealized = unrealizedPositiveValues.length > 0 ? Math.min(...unrealizedPositiveValues) : 0;
                 const maxUnrealized = unrealizedPositiveValues.length > 0 ? Math.max(...unrealizedPositiveValues) : 0;
 
-                const totalColIndex = 2 + currentMaxDCA;
+                const totalColIndex = currentMaxDCA + 3;
                 const stopLossColIndex = totalColIndex + 1;
                 const spacerColIndex = stopLossColIndex + 1;
                 const unrealizedStartColIndex = spacerColIndex + 1;
